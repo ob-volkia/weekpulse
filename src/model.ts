@@ -27,6 +27,7 @@ export interface Task {
   spent: number; // minutes actually tracked with the focus timer
   deadline: DateStr | null; // "must be done by", separate from the day it's planned for
   goal: string | null; // id of a weekly goal
+  note: string | null; // vault path of the task's body note
   subtasks: Subtask[];
   extra: string[]; // indented non-checkbox lines kept verbatim
   source?: ExternalSource; // set for tasks that live in other notes
@@ -61,7 +62,7 @@ export function newId(): string {
 export function emptyTask(partial: Partial<Task> = {}): Task {
   return {
     id: newId(), title: "", done: false, tags: [], priority: 0, due: null, time: null, duration: 0,
-    recurrence: null, created: null, doneDate: null, moved: 0, spent: 0, deadline: null, goal: null, subtasks: [], extra: [], ...partial,
+    recurrence: null, created: null, doneDate: null, moved: 0, spent: 0, deadline: null, goal: null, note: null, subtasks: [], extra: [], ...partial,
   };
 }
 
@@ -103,6 +104,7 @@ export function parseTaskBody(status: string, body: string): Task {
   if ((m = take(/\[spent::\s*([^\]]+)\]/))) t.spent = parseDuration(m[1]);
   if ((m = take(/\[deadline::\s*(\d{4}-\d{2}-\d{2})\s*\]/))) t.deadline = m[1];
   if ((m = take(/\[goal::\s*([\w-]+)\s*\]/))) t.goal = m[1];
+  if ((m = take(/\[note::\s*([^\]]+?)\s*\]/))) t.note = m[1];
   body = body.replace(/\s\^[\w-]+\s*$/, " "); // block id
   t.tags = [...body.matchAll(/(?:^|\s)#([\p{L}\p{N}_\/-]+)/gu)].map((x) => x[1]);
   body = body.replace(/(?:^|\s)#[\p{L}\p{N}_\/-]+/gu, " ");
@@ -119,6 +121,7 @@ export function serializeTask(t: Task): string[] {
   if (t.spent) parts.push(`[spent:: ${formatDuration(t.spent)}]`);
   if (t.deadline) parts.push(`[deadline:: ${t.deadline}]`);
   if (t.goal) parts.push(`[goal:: ${t.goal}]`);
+  if (t.note) parts.push(`[note:: ${t.note}]`);
   if (t.priority) parts.push(PRIORITY_EMOJI[t.priority]);
   if (t.recurrence) parts.push(`🔁 ${t.recurrence}`);
   if (t.created) parts.push(`➕ ${t.created}`);

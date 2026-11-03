@@ -2,6 +2,7 @@ import { App, Events, TFile, TFolder, normalizePath } from "obsidian";
 import { DateStr, addDays, humanDay, isoWeek, today, weekday } from "./dates";
 import { ExternalIndex, isExternalId } from "./external";
 import { CalEvent, expandEvents } from "./ics";
+import { NoteMeta, TaskBody, emptyBody, isEmptyBody, metaOf, parseBody, safeName, serializeBody } from "./tasknotes";
 import { Doc, Task, docTasks, emptyTask, newId, nextOccurrence, parseDoc, parseTaskBody, serializeDoc, serializeTask } from "./model";
 
 export interface PlannerSettings {
@@ -32,6 +33,8 @@ export interface PlannerSettings {
   backupDays: number;
   calendars: string[]; // ICS links
   savedFilters: SavedFilter[];
+  taskNotesFolder: string;
+  attachmentsFolder: string;
 }
 
 export interface SavedFilter {
@@ -75,6 +78,8 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   backupDays: 30,
   calendars: [],
   savedFilters: [],
+  taskNotesFolder: "Planner/Tasks",
+  attachmentsFolder: "Planner/Attachments",
 };
 
 export interface Template {
@@ -117,6 +122,7 @@ export class Store extends Events {
   external: ExternalIndex;
   goals = new Map<string, Goal[]>(); // week key ("2026-W45") -> goals
   feeds: string[] = []; // raw ICS texts, index = calendar
+  noteMeta = new Map<string, NoteMeta>(); // task body note path -> counts for card badges
   private eventCache = new Map<string, CalEvent[]>(); // month "2026-11" -> events
   private lastWritten = new Map<string, string>();
   private undoStack: { label: string; path: string; text: string }[] = [];
@@ -130,7 +136,7 @@ export class Store extends Events {
     const s = this.settings;
     return path === normalizePath(s.tasksFile) || path === normalizePath(s.habitsFile) || path === normalizePath(s.templatesFile)
       || path === normalizePath(s.goalsFile)
-      || [s.archiveFolder, s.reviewsFolder, s.backupsFolder].some((f) => path.startsWith(normalizePath(f) + "/"));
+      || [s.archiveFolder, s.reviewsFolder, s.backupsFolder, s.taskNotesFolder, s.attachmentsFolder].some((f) => path.startsWith(normalizePath(f) + "/"));
   }
 
   /** Tasks from Tasks.md only. */
@@ -166,6 +172,11 @@ export class Store extends Events {
   }
 
   onNoteChanged(path: string, text: string) {
+    if (this.inNotesFolder(path)) {
+      this.noteMeta.set(path, metaOf(parseBody(text)));
+      this.trigger("changed");
+      return;
+    }
     if (!this.settings.scanVault || this.isPlannerPath(path)) return;
     if (this.external.scanText(path, text)) this.trigger("changed");
   }
@@ -206,6 +217,70 @@ export class Store extends Events {
     await this.loadTasks();
     await this.loadHabits();
     await this.loadGoals();
+    await this.loadNoteMeta();
+  }
+
+  // ---------- task body notes ----------
+
+  private inNotesFolder(path: string) {
+    return path.startsWith(normalizePath(this.settings.taskNotesFolder) + "/");
+  }
+
+  async loadNoteMeta() {
+    this.noteMeta.clear();
+    for (const f of this.app.vault.getMarkdownFiles())
+      if (this.inNotesFolder(f.path)) this.noteMeta.set(f.path, metaOf(parseBody(await this.app.vault.cachedRead(f))));
+    this.trigger("changed");
+  }
+
+  async readBody(t: Task): Promise<TaskBody> {
+    if (t.note) {
+      const f = this.app.vault.getAbstractFileByPath(t.note);
+      if (f instanceof TFile) return parseBody(await this.app.vault.read(f));
+    }
+    // v2.3 kept notes as indented lines under the task: show them as the description.
+    const body = emptyBody();
+    body.description = t.extra.map((l) => l.replace(/^(\t| {1,4})/, "")).join("\n").trim();
+    return body;
+  }
+
+  /** Write the body note (created on first content) and link it from the task. */
+  async saveBody(taskId: string, title: string, body: TaskBody) {
+    const t = this.find(taskId);
+    if (!t || t.source) return;
+    if (!t.note && isEmptyBody(body)) {
+      if (t.extra.length) await this.update(taskId, { extra: [] });
+      return;
+    }
+    let path = t.note;
+    if (!path) {
+      const folder = normalizePath(this.settings.taskNotesFolder);
+      path = `${folder}/${safeName(title)}.md`;
+      if (this.app.vault.getAbstractFileByPath(path)) path = `${folder}/${safeName(title)} ${taskId}.md`;
+    }
+    const text = serializeBody(taskId, title, body);
+    const file = this.app.vault.getAbstractFileByPath(path);
+    if (file instanceof TFile) await this.app.vault.process(file, () => text);
+    else await this.ensureFile(path, text);
+    this.noteMeta.set(path, metaOf(body));
+    if (t.note !== path || t.extra.length) await this.update(taskId, { note: path, extra: [] });
+    else this.trigger("changed");
+  }
+
+  async attach(taskId: string, name: string, data: ArrayBuffer): Promise<string> {
+    const folder = normalizePath(this.settings.attachmentsFolder);
+    if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+    const dot = name.lastIndexOf(".");
+    const base = safeName(dot > 0 ? name.slice(0, dot) : name);
+    const ext = dot > 0 ? name.slice(dot).toLowerCase() : "";
+    let path = `${folder}/${taskId}-${base}${ext}`;
+    for (let i = 2; this.app.vault.getAbstractFileByPath(path); i++) path = `${folder}/${taskId}-${base}-${i}${ext}`;
+    await this.app.vault.createBinary(path, data);
+    return path;
+  }
+
+  metaFor(t: Task): NoteMeta | null {
+    return t.note ? this.noteMeta.get(t.note) ?? null : null;
   }
 
   async loadGoals() {

@@ -24,6 +24,7 @@ P.hide = function () { this.style.display = "none"; };
 (DocumentFragment.prototype as any).createDiv = P.createDiv;
 (DocumentFragment.prototype as any).createEl = P.createEl;
 (window as any).createDiv = (o?: Attrs | string) => applyOpts(document.createElement("div"), o);
+(window as any).createSpan = (o?: Attrs | string) => applyOpts(document.createElement("span"), o);
 
 export class Events {
   private h = new Map<string, Function[]>();
@@ -99,6 +100,7 @@ export class FuzzySuggestModal<T> extends SuggestModal<any> {
   onChooseSuggestion(v: any) { this.onChooseItem(v.item); }
 }
 export type FuzzyMatch<T> = { item: T; match: any }; export type MarkdownPostProcessorContext = any;
+export async function requestUrl(o: { url: string }) { return { text: `<title>Страница ${o.url.split("/")[2] ?? ""}</title>` }; }
 export class Plugin {} export class PluginSettingTab {} export class Setting {}
 export type App = any; export type WorkspaceLeaf = any;
 
@@ -115,6 +117,8 @@ export class MemVault extends Events {
   async cachedRead(f: TFile) { return this.read(f); }
   async create(p: string, d: string) { this.files.set(p, d); return new TFile(p); }
   async createFolder() {}
+  async createBinary(p: string, _d: ArrayBuffer) { this.files.set(p, "<binary>"); return new TFile(p); }
+  getResourcePath(_f: TFile) { return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3Crect width='10' height='10' fill='%237f6df2'/%3E%3C/svg%3E"; }
   getMarkdownFiles() { return [...this.files.keys()].filter((k) => k.endsWith(".md")).map((k) => new TFile(k)); }
   async process(f: TFile, fn: (d: string) => string) { const out = fn(this.files.get(f.path) ?? ""); this.files.set(f.path, out); (window as any).__onWrite?.(f.path, out); return out; }
 }

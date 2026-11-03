@@ -30,6 +30,8 @@ export class MemVault {
   async cachedRead(f: TFile) { return this.read(f); }
   async create(p: string, d: string) { this.files.set(p, d); return new TFile(p); }
   async createFolder() {}
+  bin = new Map<string, ArrayBuffer>();
+  async createBinary(p: string, d: ArrayBuffer) { this.bin.set(p, d); this.files.set(p, "<binary>"); return new TFile(p); }
   async delete(f: TFile) { this.files.delete(f.path); }
   async rename(f: TFile, to: string) { this.files.set(to, this.files.get(f.path)!); this.files.delete(f.path); }
   async process(f: TFile, fn: (d: string) => string) { const out = fn(this.files.get(f.path) ?? ""); this.files.set(f.path, out); return out; }

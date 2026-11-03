@@ -838,7 +838,11 @@ export class WeekView extends ItemView {
         iconText(meta, "flag", left === 0 ? "сегодня" : left === 1 ? "до завтра" : `до ${humanDay(t.deadline)}`, `wp-meta wp-deadline ${cls}`,
           left < 0 ? `Дедлайн прошёл ${humanDay(t.deadline)}` : `Дедлайн: ${humanDay(t.deadline)}`);
       }
-      if (taskNotes(t)) icon(meta.createSpan({ cls: "wp-meta", attr: { "aria-label": "Есть заметки" } }), "align-left");
+      const nm = this.store.metaFor(t);
+      if (nm?.description || taskNotes(t)) icon(meta.createSpan({ cls: "wp-meta", attr: { "aria-label": "Есть описание" } }), "align-left");
+      if (nm?.links) iconText(meta, "link", String(nm.links), "wp-meta", "Ссылки");
+      if (nm?.files) iconText(meta, "paperclip", String(nm.files), "wp-meta", "Файлы");
+      if (nm?.comments) iconText(meta, "message-circle", String(nm.comments), "wp-meta", "Комментарии");
       if (t.goal) {
         const g = this.store.findGoal(t.goal);
         if (g) iconText(meta, "target", g.title, "wp-meta wp-goal-badge", "Цель недели");

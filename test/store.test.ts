@@ -2,6 +2,7 @@ import { MemVault, TFile } from "obsidian";
 import { Store, DEFAULT_SETTINGS, weekKey, parseGoals, serializeGoals } from "../src/store";
 import { expandEvents } from "../src/ics";
 import { parseQuick } from "../src/quickadd";
+import { parseBody, serializeBody } from "../src/tasknotes";
 import { today, addDays, startOfWeek, weekday } from "../src/dates";
 
 let fail = 0;
@@ -138,6 +139,32 @@ END:VCALENDAR`;
     eq("«к врачу» stays in title", [q2.task.title, q2.task.deadline ?? null], ["Пойти к врачу", null]);
     const q3 = parseQuick("Сдать налоги до 15.12 завтра");
     eq("deadline + planned day", [q3.task.title, q3.task.deadline?.slice(5), q3.due], ["Сдать налоги", "12-15", addDays(T, 1)]);
+  }
+  // task body notes
+  {
+    const body = { description: "Сделать лендинг.\n\n- [ ] пункт ТЗ", links: [{ title: "Figma", url: "https://figma.com/x" }], files: ["Planner/Attachments/t1-brief.pdf"],
+      comments: [{ at: "2026-11-03 14:20", text: "согласовал\nвторая строка" }] };
+    const text = serializeBody("t1", "Лендинг", body);
+    eq("body roundtrip", parseBody(text), body);
+    eq("bare link parsed", parseBody("## Ссылки\n- https://a.b/c\n").links, [{ title: "", url: "https://a.b/c" }]);
+    const { vault, store } = await fresh(`- [ ] Лендинг 📅 ${T} 🆔 t1\n    старая заметка\n`);
+    eq("legacy indented notes read as description", (await store.readBody(store.find("t1")!)).description, "старая заметка");
+    const p = await store.attach("t1", "brief.PDF", new ArrayBuffer(4));
+    eq("attachment path", p, "Planner/Attachments/t1-brief.pdf");
+    eq("second attachment gets suffix", await store.attach("t1", "brief.pdf", new ArrayBuffer(4)), "Planner/Attachments/t1-brief-2.pdf");
+    await store.saveBody("t1", "Лендинг", body);
+    const t = store.find("t1")!;
+    eq("note linked, extra cleared", [t.note, t.extra.length], ["Planner/Tasks/Лендинг.md", 0]);
+    eq("note written", parseBody(vault.files.get("Planner/Tasks/Лендинг.md")!).comments.length, 1);
+    eq("task line keeps note field", line(vault, "t1").includes("[note:: Planner/Tasks/Лендинг.md]"), true);
+    eq("meta for card badges", store.metaFor(t), { links: 1, files: 1, comments: 1, description: true });
+    await store.add({ title: "Лендинг" }, T);
+    const other = store.tasks().find((x) => x.id !== "t1")!;
+    await store.saveBody(other.id, "Лендинг", { description: "x", links: [], files: [], comments: [] });
+    eq("same title gets id suffix", store.find(other.id)!.note, `Planner/Tasks/Лендинг ${other.id}.md`);
+    const { store: s2 } = await fresh(`- [ ] Пусто 📅 ${T} 🆔 e\n`);
+    await s2.saveBody("e", "Пусто", { description: "  ", links: [], files: [], comments: [] });
+    eq("empty body creates no note", s2.find("e")!.note, null);
   }
   process.exit(fail ? 1 : 0);
 })();
