@@ -3,6 +3,7 @@ import { DateStr, addDays, startOfWeek, today, weekday } from "./dates";
 import { dailyTemplate, registerDailyBlocks } from "./daily";
 import { FocusTimer, FocusView, VIEW_FOCUS, fmtClock } from "./focus";
 import { HabitsView, VIEW_HABITS } from "./habitsView";
+import { injectNavbarButton, removeNavbarButton } from "./navbar";
 import { Task, displayTitle } from "./model";
 import { TaskModal } from "./modal";
 import { PromptModal, TaskPalette } from "./palette";
@@ -74,6 +75,7 @@ export default class WeekPlannerPlugin extends Plugin {
       await this.store.scanExternal();
       if (this.settings.openOnStartup && !this.app.workspace.getLeavesOfType(VIEW_WEEK).length) await this.activateWeek();
       this.maybePromptPlanning();
+      this.setupNavbarButton();
     });
 
     this.registerInterval(window.setInterval(() => {
@@ -89,6 +91,25 @@ export default class WeekPlannerPlugin extends Plugin {
 
   onunload() {
     this.focus?.destroy();
+    removeNavbarButton();
+  }
+
+  // ---------- phone bottom bar ----------
+
+  private navbarWatching = false;
+
+  setupNavbarButton() {
+    if (!Platform.isPhone) return;
+    if (!this.settings.navbarButton) return removeNavbarButton();
+    const inject = () => {
+      if (this.settings.navbarButton) injectNavbarButton(() => new TaskModal(this.app, this, null, today()).open());
+    };
+    inject();
+    if (this.navbarWatching) return;
+    this.navbarWatching = true;
+    // Obsidian may rebuild the bar (rotation, layout changes); put the button back.
+    this.registerEvent(this.app.workspace.on("layout-change", inject));
+    this.registerInterval(window.setInterval(inject, 3000));
   }
 
   private async dailyMaintenance() {
@@ -307,5 +328,14 @@ class PlannerSettingTab extends PluginSettingTab {
     num("Помодоро, минут", "", "pomodoroMinutes", 5, 120);
     num("Перерыв, минут", "", "breakMinutes", 1, 60);
     toggle("Открывать неделю при запуске", "", "openOnStartup");
+
+    new Setting(containerEl).setName("iPhone").setHeading();
+    new Setting(containerEl).setName("Кнопка «+» в нижней панели")
+      .setDesc("Добавляет в нижнюю панель Obsidian кнопку новой задачи. Неофициальный способ: после обновления Obsidian кнопка может пропасть — тогда просто выключи.")
+      .addToggle((t) => t.setValue(s.navbarButton).onChange(async (v) => {
+        s.navbarButton = v;
+        await save();
+        this.plugin.setupNavbarButton();
+      }));
   }
 }

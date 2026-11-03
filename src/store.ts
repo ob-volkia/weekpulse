@@ -25,6 +25,7 @@ export interface PlannerSettings {
   planningPrompt: boolean;
   lastPlannedWeek: string;
   mobileHintShown: boolean;
+  navbarButton: boolean;
 }
 
 export const DEFAULT_SETTINGS: PlannerSettings = {
@@ -49,6 +50,7 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   planningPrompt: true,
   lastPlannedWeek: "",
   mobileHintShown: false,
+  navbarButton: true,
 };
 
 export interface Template {
