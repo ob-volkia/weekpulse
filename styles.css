@@ -486,7 +486,8 @@ button.wp-danger { color: var(--color-red); }
 .wp-m-progress-fill { height: 100%; background: var(--interactive-accent); border-radius: 2px; }
 
 /* phone lists clear the floating bar and the + button */
-.wp-root.is-mobile .wp-m-list { padding-bottom: calc(var(--wp-bottom-safe) + 72px); }
+.wp-root.is-mobile .wp-m-list { padding-bottom: calc(var(--wp-bottom-safe) + 16px); }
+.wp-root.is-mobile .wp-m-list:has(~ .wp-fab) { padding-bottom: calc(var(--wp-bottom-safe) + 72px); }
 .wp-root.is-mobile .wp-m-head { flex: none; }
 
 /* floating + */

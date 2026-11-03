@@ -1012,7 +1012,9 @@ export class WeekView extends ItemView {
     for (const t of tasks) this.renderCard(list, t);
     if (!tasks.length) list.createDiv({ cls: "wp-empty", text: day === now ? "На сегодня всё чисто" : "Нет задач" });
     list.createDiv("wp-list-end");
-    this.renderFab(root, day);
+    // The "+" lives in Obsidian's bottom bar now; the floating one is only a fallback
+    // for when that button is turned off or Obsidian's bar changed and it couldn't be added.
+    if (!(this.settings.navbarButton && document.querySelector(".wp-navbar-add"))) this.renderFab(root, day);
     this.maybeShowHint();
   }
 
