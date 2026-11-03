@@ -7,7 +7,9 @@
     "dev": "node esbuild.config.mjs watch",
     "typecheck": "tsc --noEmit",
     "deploy": "OUT_DIR=\"$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Планер/.obsidian/plugins/week-planner\" node esbuild.config.mjs",
-    "test": "esbuild test/logic.test.ts --bundle --platform=node --outfile=dist/test.cjs --log-level=warning && node dist/test.cjs"
+    "test": "esbuild test/logic.test.ts --bundle --platform=node --outfile=dist/test.cjs --log-level=warning && node dist/test.cjs",
+    "phone:bridge": "../.tools-venv/bin/pymobiledevice3 webinspector cdp",
+    "phone": "node tools/phone.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
