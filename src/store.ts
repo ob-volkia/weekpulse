@@ -2,6 +2,9 @@ import { App, Events, TFile, TFolder, normalizePath } from "obsidian";
 import { DateStr, addDays, humanDay, isoWeek, today, weekday } from "./dates";
 import { ExternalIndex, isExternalId } from "./external";
 import { CalEvent, expandEvents } from "./ics";
+import { mergeGoals, mergeHabits, mergeTasks } from "./merge";
+import { LogEntry, parseLog, serializeLog } from "./changelog";
+import { nowStamp } from "./tasknotes";
 import { NoteMeta, TaskBody, emptyBody, isEmptyBody, metaOf, parseBody, safeName, serializeBody } from "./tasknotes";
 import { Doc, Task, docTasks, emptyTask, newId, nextOccurrence, parseDoc, parseTaskBody, serializeDoc, serializeTask } from "./model";
 
@@ -35,6 +38,7 @@ export interface PlannerSettings {
   savedFilters: SavedFilter[];
   taskNotesFolder: string;
   attachmentsFolder: string;
+  logFolder: string;
 }
 
 export interface SavedFilter {
@@ -80,6 +84,7 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   savedFilters: [],
   taskNotesFolder: "Planner/Tasks",
   attachmentsFolder: "Planner/Attachments",
+  logFolder: "Planner/Log",
 };
 
 export interface Template {
@@ -124,7 +129,10 @@ export class Store extends Events {
   feeds: string[] = []; // raw ICS texts, index = calendar
   noteMeta = new Map<string, NoteMeta>(); // task body note path -> counts for card badges
   private eventCache = new Map<string, CalEvent[]>(); // month "2026-11" -> events
-  private lastWritten = new Map<string, string>();
+  private lastWritten = new Map<string, string>(); // our latest write per file
+  private base = new Map<string, string>(); // last version we shared with other devices
+  device = "Устройство"; // set by the plugin: "Mac", "iPhone"…
+  private logQueue: Promise<void> = Promise.resolve();
   private undoStack: { label: string; path: string; text: string }[] = [];
 
   constructor(private app: App, public settings: PlannerSettings) {
@@ -136,7 +144,7 @@ export class Store extends Events {
     const s = this.settings;
     return path === normalizePath(s.tasksFile) || path === normalizePath(s.habitsFile) || path === normalizePath(s.templatesFile)
       || path === normalizePath(s.goalsFile)
-      || [s.archiveFolder, s.reviewsFolder, s.backupsFolder, s.taskNotesFolder, s.attachmentsFolder].some((f) => path.startsWith(normalizePath(f) + "/"));
+      || [s.archiveFolder, s.reviewsFolder, s.backupsFolder, s.taskNotesFolder, s.attachmentsFolder, s.logFolder].some((f) => path.startsWith(normalizePath(f) + "/"));
   }
 
   /** Tasks from Tasks.md only. */
@@ -279,19 +287,42 @@ export class Store extends Events {
     return path;
   }
 
+  /** Files in the attachments folder that no task note or other note embeds or links. */
+  async findUnusedAttachments(): Promise<TFile[]> {
+    const folder = this.app.vault.getAbstractFileByPath(normalizePath(this.settings.attachmentsFolder));
+    if (!(folder instanceof TFolder)) return [];
+    const used = new Set<string>();
+    for (const f of this.app.vault.getMarkdownFiles())
+      if (this.inNotesFolder(f.path)) parseBody(await this.app.vault.cachedRead(f)).files.forEach((x) => used.add(x));
+    const links = (this.app.metadataCache as unknown as { resolvedLinks?: Record<string, Record<string, number>> }).resolvedLinks ?? {};
+    for (const targets of Object.values(links)) for (const t of Object.keys(targets)) used.add(t);
+    const out: TFile[] = [];
+    const walk = (dir: TFolder) => {
+      for (const c of dir.children) {
+        if (c instanceof TFolder) walk(c);
+        else if (c instanceof TFile && !used.has(c.path)) out.push(c);
+      }
+    };
+    walk(folder);
+    return out;
+  }
+
   metaFor(t: Task): NoteMeta | null {
     return t.note ? this.noteMeta.get(t.note) ?? null : null;
   }
 
   async loadGoals() {
     const file = await this.ensureFile(this.settings.goalsFile, GOALS_HEADER);
-    this.goals = parseGoals(await this.app.vault.read(file));
+    const text = await this.app.vault.read(file);
+    this.base.set(file.path, text);
+    this.goals = parseGoals(text);
     this.trigger("changed");
   }
 
   async loadTasks() {
     const file = await this.ensureFile(this.settings.tasksFile, TASKS_HEADER);
     const text = await this.app.vault.read(file);
+    this.base.set(file.path, text);
     this.doc = parseDoc(text);
     // Tasks typed by hand have no id yet: give them one so drag & drop can address them.
     if (this.tasks().some((t) => !t.id)) await this.mutate(() => {});
@@ -300,7 +331,9 @@ export class Store extends Events {
 
   async loadHabits() {
     const file = await this.ensureFile(this.settings.habitsFile, HABITS_HEADER + "\n## Список\n\n## Журнал\n");
-    this.habits = parseHabits(await this.app.vault.read(file));
+    const htext = await this.app.vault.read(file);
+    this.base.set(file.path, htext);
+    this.habits = parseHabits(htext);
     this.trigger("changed");
   }
 
@@ -312,22 +345,41 @@ export class Store extends Events {
       if (this.isConflictCopy(path)) this.trigger("conflict", path);
       return;
     }
-    const text = await this.app.vault.read(file);
-    if (this.lastWritten.get(path) === text) return;
-    if (path === normalizePath(s.goalsFile)) {
-      this.goals = parseGoals(text);
-      this.trigger("changed");
-      return;
+    const theirs = await this.app.vault.read(file);
+    const ours = this.lastWritten.get(path);
+    if (ours === theirs) return; // our own write coming back
+    const base = this.base.get(path);
+    let result = theirs;
+    // We changed the file since we last shared it: replay our edits on top of theirs.
+    if (ours !== undefined && base !== undefined && ours !== base) {
+      if (path === normalizePath(s.tasksFile)) {
+        const m = mergeTasks(base, ours, theirs);
+        result = m.text;
+        if (m.stats.added + m.stats.removed + m.stats.changed) this.logAction("Объединено с другим устройством", `задач: ${m.stats.added + m.stats.changed + m.stats.removed}`);
+        if (m.stats.added + m.stats.removed + m.stats.changed)
+          this.trigger("merged", `Задачи с другого устройства объединены с твоими правками (${m.stats.added + m.stats.changed + m.stats.removed})`);
+      } else if (path === normalizePath(s.habitsFile)) {
+        result = serializeHabits(mergeHabits(parseHabits(base), parseHabits(ours), parseHabits(theirs)));
+      } else {
+        result = serializeGoals(mergeGoals(parseGoals(base), parseGoals(ours), parseGoals(theirs)));
+      }
     }
-    if (path === normalizePath(this.settings.tasksFile)) {
-      this.doc = parseDoc(text);
-      if (this.tasks().some((t) => !t.id)) await this.mutate(() => {});
-      else this.trigger("changed");
+    this.base.set(path, theirs);
+    if (result !== theirs) {
+      await this.app.vault.process(file, () => result);
+      this.lastWritten.set(path, result);
     } else {
-      this.habits = parseHabits(text);
-      this.trigger("changed");
+      this.lastWritten.delete(path);
     }
+    if (path === normalizePath(s.goalsFile)) this.goals = parseGoals(result);
+    else if (path === normalizePath(s.habitsFile)) this.habits = parseHabits(result);
+    else {
+      this.doc = parseDoc(result);
+      if (this.tasks().some((t) => !t.id)) return void (await this.mutate(() => {}));
+    }
+    this.trigger("changed");
   }
+
 
   /** Read-modify-write against the current file contents, so edits from other devices aren't clobbered. */
   async mutate(fn: (doc: Doc) => void, undoLabel?: string) {
@@ -370,6 +422,7 @@ export class Store extends Events {
     else if (entry.path === normalizePath(this.settings.habitsFile)) this.habits = parseHabits(entry.text);
     else if (entry.path === normalizePath(this.settings.goalsFile)) this.goals = parseGoals(entry.text);
     this.trigger("changed");
+    this.logAction("Отменено", entry.label);
     return entry.label;
   }
 
@@ -396,6 +449,7 @@ export class Store extends Events {
       const idx = insertIndexForDay(doc, due);
       doc.lines.splice(idx, 0, { kind: "task", task });
     });
+    this.logAction("Добавлена", task.title);
     return task;
   }
 
@@ -405,14 +459,19 @@ export class Store extends Events {
       if (t && "due" in patch) await this.external.setDue(t, patch.due ?? null);
       return;
     }
+    const before = this.find(id);
     await this.mutate((doc) => {
       const t = docTasks(doc).find((x) => x.id === id);
       if (t) Object.assign(t, patch);
     });
+    const after = this.find(id);
+    if (before && after && serializeTask(before).join("\n") !== serializeTask(after).join("\n")) this.logAction("Изменена", after.title);
   }
 
   async remove(id: string) {
     if (isExternalId(id)) return;
+    const gone = this.find(id);
+    if (gone) this.logAction("Удалена", gone.title, serializeTask(gone));
     await this.mutate((doc) => {
       doc.lines = doc.lines.filter((l) => !(l.kind === "task" && l.task.id === id));
     }, "Задача удалена");
@@ -448,6 +507,8 @@ export class Store extends Events {
         }
       }
     }, this.find(id)?.done ? "Задача возвращена в работу" : "Задача выполнена");
+    const t = this.find(id);
+    if (t) this.logAction(t.done ? "Выполнена" : "Возвращена", t.title);
   }
 
   /** Move a task to `due` (null = backlog), placing it before `beforeId` or at the end of that day. */
@@ -458,6 +519,7 @@ export class Store extends Events {
       return;
     }
     if (beforeId && isExternalId(beforeId)) beforeId = null;
+    const fromDue = this.find(id)?.due;
     await this.mutate((doc) => {
       const idx = doc.lines.findIndex((l) => l.kind === "task" && l.task.id === id);
       if (idx < 0) return;
@@ -473,6 +535,12 @@ export class Store extends Events {
       if (at < 0) at = insertIndexForDay(doc, due);
       doc.lines.splice(at, 0, line);
     }, this.find(id)?.due === due ? undefined : `Перенесено: ${due ? humanDay(due) : "бэклог"}`);
+    this.moveLog(id, fromDue, due);
+  }
+
+  private moveLog(id: string, from: DateStr | null | undefined, due: DateStr | null) {
+    const t = this.find(id);
+    if (t && from !== due) this.logAction(`Перенесена → ${due ? humanDay(due) : "бэклог"}`, t.title);
   }
 
   // ---------- bulk (multi-select) ----------
@@ -485,6 +553,7 @@ export class Store extends Events {
     }
     if (!own.length) return;
     const set = new Set(own);
+    const removed = op === "remove" ? own.map((id) => this.find(id)).filter((t): t is Task => !!t) : [];
     const label = op === "done" ? `Выполнено задач: ${own.length}` : op === "remove" ? `Удалено задач: ${own.length}` : `Перенесено задач: ${own.length}`;
     await this.mutate((doc) => {
       if (op === "remove") {
@@ -501,6 +570,7 @@ export class Store extends Events {
         }
       }
     }, label);
+    this.logAction(label.replace(/:.*$/, ""), String(own.length), removed.flatMap(serializeTask));
   }
 
   async addMany(items: { task: Partial<Task>; due: DateStr | null }[]) {
@@ -518,6 +588,51 @@ export class Store extends Events {
       const t = docTasks(doc).find((x) => x.id === id);
       if (t) t.spent += minutes;
     });
+  }
+
+  // ---------- change log ----------
+
+  private logPath(device = this.device) {
+    return `${normalizePath(this.settings.logFolder)}/${device}.md`;
+  }
+
+  /** Append an entry to this device's log (serialized, never throws). */
+  logAction(action: string, title: string, lines: string[] = []) {
+    const entry: LogEntry = { at: nowStamp(), action, title, lines, device: this.device };
+    this.logQueue = this.logQueue.then(async () => {
+      try {
+        const path = this.logPath();
+        const file = this.app.vault.getAbstractFileByPath(path);
+        if (file instanceof TFile) await this.app.vault.process(file, (data) => serializeLog(this.device, [entry, ...parseLog(data, this.device)]));
+        else await this.ensureFile(path, serializeLog(this.device, [entry]));
+      } catch (e) {
+        console.error("Week Planner: log write failed", e);
+      }
+    });
+  }
+
+  /** Entries from every device, newest first. */
+  async readLog(): Promise<LogEntry[]> {
+    await this.logQueue;
+    const folder = this.app.vault.getAbstractFileByPath(normalizePath(this.settings.logFolder));
+    if (!(folder instanceof TFolder)) return [];
+    const out: LogEntry[] = [];
+    for (const f of folder.children)
+      if (f instanceof TFile && f.extension === "md") out.push(...parseLog(await this.app.vault.cachedRead(f), f.basename));
+    return out.sort((a, b) => b.at.localeCompare(a.at));
+  }
+
+  /** Put task lines from a log entry back into Tasks.md (skips tasks that already exist). */
+  async restoreLines(lines: string[]): Promise<number> {
+    const tasks = docTasks(parseDoc(lines.join("\n")));
+    const existing = new Set(this.tasks().map((t) => t.id));
+    const back = tasks.filter((t) => !existing.has(t.id));
+    if (!back.length) return 0;
+    await this.mutate((doc) => {
+      for (const t of back) doc.lines.splice(insertIndexForDay(doc, t.due), 0, { kind: "task", task: t });
+    }, `Возвращено задач: ${back.length}`);
+    this.logAction("Возвращена из журнала", back.map((t) => t.title).join(", "));
+    return back.length;
   }
 
   // ---------- backups ----------
@@ -583,6 +698,7 @@ export class Store extends Events {
     }
     this.undoStack = [];
     await this.init();
+    this.logAction("Восстановлено из копии", stamp);
   }
 
   // ---------- iCloud conflict copies ("Tasks 2.md") ----------
@@ -647,6 +763,7 @@ export class Store extends Events {
     const folder = normalizePath(s.backupsFolder);
     if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
     await this.app.vault.rename(copy, `${folder}/${today()} конфликт ${copy.name}`);
+    this.logAction("Слита копия iCloud", `${copy.name}: ${summary}`);
     return summary;
   }
 
@@ -776,6 +893,7 @@ export class Store extends Events {
         count++;
       }
     });
+    if (count) this.logAction("Перенесено на сегодня", `задач: ${count}`);
     return count;
   }
 
@@ -798,6 +916,7 @@ export class Store extends Events {
     await this.mutate((doc) => {
       doc.lines = doc.lines.filter((l) => !(l.kind === "task" && ids.has(l.task.id)));
     });
+    this.logAction("В архив", `задач: ${old.length}`);
     return old.length;
   }
 

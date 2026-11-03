@@ -722,3 +722,14 @@ button.wp-danger { color: var(--color-red); }
 .wp-toolbar-3 .wp-week-title { margin-left: 10px; white-space: nowrap; }
 /* phone: navigation on the left, the date pushed to the right edge */
 .wp-root.is-mobile .wp-m-row .wp-week-title { margin-left: auto; text-align: right; }
+
+/* ======================= v2.7: log ======================= */
+.wp-modal.wp-log-modal { width: min(640px, 96vw); }
+.wp-log-bar { display: flex; gap: 6px; margin-bottom: 8px; }
+.wp-log-list { display: flex; flex-direction: column; max-height: 60vh; overflow-y: auto; }
+.wp-log-day { font-size: var(--font-ui-smaller); font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; padding: 10px 0 4px; }
+.wp-log-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--background-modifier-border); font-size: var(--font-ui-small); }
+.wp-log-time { color: var(--text-muted); font-variant-numeric: tabular-nums; flex: none; width: 40px; }
+.wp-log-body { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-log-action { font-weight: 600; }
+.wp-log-device { color: var(--text-faint); font-size: var(--font-ui-smaller); flex: none; }

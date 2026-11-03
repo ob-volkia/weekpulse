@@ -3,6 +3,8 @@ import { Store, DEFAULT_SETTINGS, weekKey, parseGoals, serializeGoals } from "..
 import { expandEvents } from "../src/ics";
 import { parseQuick } from "../src/quickadd";
 import { parseBody, serializeBody } from "../src/tasknotes";
+import { mergeTasks } from "../src/merge";
+import { parseHabits, serializeHabits } from "../src/store";
 import { today, addDays, startOfWeek, weekday } from "../src/dates";
 
 let fail = 0;
@@ -165,6 +167,73 @@ END:VCALENDAR`;
     const { store: s2 } = await fresh(`- [ ] Пусто 📅 ${T} 🆔 e\n`);
     await s2.saveBody("e", "Пусто", { description: "  ", links: [], files: [], comments: [] });
     eq("empty body creates no note", s2.find("e")!.note, null);
+  }
+  // three-way merge
+  {
+    const H = "# Задачи\n\n";
+    const base = H + `- [ ] A 📅 ${T} 🆔 a\n- [ ] B 📅 ${T} 🆔 b\n- [ ] C 📅 ${T} 🆔 c\n`;
+    const ours = H + `- [x] A 📅 ${T} ✅ ${T} 🆔 a\n- [ ] B 📅 ${T} 🆔 b\n- [ ] Mine 📅 ${T} 🆔 m\n`; // done A, deleted C, added Mine
+    const theirs = H + `- [ ] A 📅 ${T} 🆔 a\n- [ ] B renamed 📅 ${T} 🆔 b\n- [ ] C 📅 ${T} 🆔 c\n- [ ] Theirs 📅 ${T} 🆔 t\n`;
+    const { text, stats } = mergeTasks(base, ours, theirs);
+    const ids = (x: string) => x.split("\n").filter((l) => l.includes("🆔")).map((l) => l.match(/🆔 (\w+)/)![1]).sort();
+    eq("merge keeps both sides' tasks, drops our deletion", ids(text), ["a", "b", "m", "t"]);
+    eq("merge keeps our done + their rename", [text.includes("- [x] A"), text.includes("B renamed")], [true, true]);
+    eq("merge stats", stats, { added: 1, removed: 1, changed: 1 });
+    const edited = H + `- [ ] C changed 📅 ${T} 🆔 c\n`;
+    eq("edit beats remote delete", mergeTasks(H + `- [ ] C 📅 ${T} 🆔 c\n`, edited, H).text.includes("C changed"), true);
+  }
+  // the lost-habit-ticks scenario: phone ticks, Mac writes from a stale copy
+  {
+    const vault = new MemVault();
+    const stale = "# Привычки\n\n## Список\n\n- Не курил 🆔 h1\n\n## Журнал\n\n";
+    vault.files.set("Planner/Habits.md", stale);
+    vault.files.set("Planner/Tasks.md", "# Задачи\n");
+    const phone = new Store({ vault, metadataCache: { getFileCache: () => null } } as any, { ...DEFAULT_SETTINGS });
+    await phone.init();
+    await phone.toggleHabit("h1", Y);
+    await phone.toggleHabit("h1", T);
+    // Mac (stale copy) adds a habit; iCloud keeps the Mac's file and delivers it to the phone
+    const macHabits = parseHabits(stale);
+    macHabits.habits.push({ id: "h2", name: "Вода", days: [] });
+    vault.files.set("Planner/Habits.md", serializeHabits(macHabits));
+    await phone.onFileModified(new TFile("Planner/Habits.md"));
+    const h = parseHabits(vault.files.get("Planner/Habits.md")!);
+    eq("phone ticks survive the stale overwrite", [h.log.get(Y)?.has("h1"), h.log.get(T)?.has("h1")], [true, true]);
+    eq("and the Mac's new habit is kept", h.habits.map((x) => x.id), ["h1", "h2"]);
+  }
+  // store-level task merge + accept when we have no local changes
+  {
+    const { vault, store } = await fresh(`- [ ] A 📅 ${T} 🆔 a\n`);
+    vault.files.set("Planner/Tasks.md", "# Задачи\n\n" + `- [ ] A edited 📅 ${T} 🆔 a\n`);
+    await store.onFileModified(new TFile("Planner/Tasks.md"));
+    eq("no local edits: accept theirs", store.find("a")!.title, "A edited");
+    await store.add({ title: "Local" }, T);
+    vault.files.set("Planner/Tasks.md", "# Задачи\n\n" + `- [x] A edited 📅 ${T} ✅ ${T} 🆔 a\n`);
+    await store.onFileModified(new TFile("Planner/Tasks.md"));
+    eq("local add survives remote write", [store.tasks().some((t) => t.title === "Local"), store.find("a")!.done], [true, true]);
+    eq("merged result written back", vault.files.get("Planner/Tasks.md")!.includes("Local"), true);
+  }
+  // change log + restore
+  {
+    const { vault, store } = await fresh(`- [ ] Молоко #дом 📅 ${T} 🆔 milk\n`);
+    store.device = "Mac test";
+    await store.toggle("milk");
+    await store.remove("milk");
+    const log = await store.readLog();
+    eq("log entries newest first", log.map((e) => e.action), ["Удалена", "Выполнена"]);
+    eq("log lives in a per-device file", vault.files.has("Planner/Log/Mac test.md"), true);
+    eq("removed task restorable", await store.restoreLines(log[0].lines), 1);
+    eq("restored task is back", store.find("milk")?.title, "Молоко");
+    eq("restoring twice adds nothing", await store.restoreLines(log[0].lines), 0);
+  }
+  // unused attachments
+  {
+    const { vault, store } = await fresh(`- [ ] X 📅 ${T} 🆔 x\n`);
+    const used = await store.attach("x", "used.png", new ArrayBuffer(1));
+    await store.attach("x", "orphan.png", new ArrayBuffer(1));
+    await store.saveBody("x", "X", { description: "", links: [], files: [used], comments: [] });
+    eq("only orphan reported", (await store.findUnusedAttachments()).map((f) => f.path), ["Planner/Attachments/x-orphan.png"]);
+    void vault;
   }
   process.exit(fail ? 1 : 0);
 })();

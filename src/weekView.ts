@@ -408,6 +408,7 @@ export class WeekView extends ItemView {
     if (!this.mobile && this.mode === "week")
       m.addItem((i) => i.setTitle(this.compact ? "Обычный вид карточек" : "Компактный вид карточек").setIcon(this.compact ? "unfold-vertical" : "fold-vertical").onClick(() => { this.compact = !this.compact; this.render(); }));
     m.addItem((i) => i.setTitle("Открыть файл задач").setIcon("file-text").onClick(() => this.openTasksFile()));
+    m.addItem((i) => i.setTitle("Журнал изменений").setIcon("history").onClick(() => this.plugin.openLog()));
     m.showAtMouseEvent(e);
   }
 

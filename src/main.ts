@@ -9,6 +9,7 @@ import { TaskModal } from "./modal";
 import { PromptModal, TaskPalette } from "./palette";
 import { parseQuick } from "./quickadd";
 import { PlanningModal } from "./planning";
+import { AttachmentsModal, LogModal } from "./maintenance";
 import { buildReview, reviewPath } from "./review";
 import { DEFAULT_SETTINGS, PlannerSettings, Store } from "./store";
 import { VIEW_WEEK, WeekView } from "./weekView";
@@ -25,6 +26,7 @@ export default class WeekPlannerPlugin extends Plugin {
   async onload() {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
     this.store = new Store(this.app, this.settings);
+    this.store.device = this.deviceName();
     this.focus = new FocusTimer(this);
 
     this.registerView(VIEW_WEEK, (leaf) => new WeekView(leaf, this));
@@ -58,6 +60,8 @@ export default class WeekPlannerPlugin extends Plugin {
     });
     cmd("restore-backup", "Восстановить из резервной копии…", () => this.openRestore());
     cmd("merge-conflicts", "Слить копии iCloud (конфликты)", () => this.checkConflicts(true));
+    cmd("change-log", "Журнал изменений", () => this.openLog());
+    cmd("unused-attachments", "Найти неиспользуемые вложения", () => this.openUnusedAttachments());
     cmd("refresh-calendars", "Обновить календари", () => this.refreshCalendars(true));
     cmd("rollover", "Перенести невыполненные задачи на сегодня", async () => new Notice(`Перенесено задач: ${await this.store.rollover()}`));
     cmd("archive", "Архивировать старые выполненные задачи", async () => new Notice(`В архив: ${await this.store.archiveOld()}`));
@@ -79,6 +83,7 @@ export default class WeekPlannerPlugin extends Plugin {
 
     this.registerEvent(this.store.on("undoable", (label) => this.offerUndo(String(label))));
     this.registerEvent(this.store.on("conflict", () => this.checkConflicts(false)));
+    this.registerEvent(this.store.on("merged", (msg) => new Notice(String(msg), 6000)));
 
     if (!Platform.isMobile) {
       this.statusEl = this.addStatusBarItem();
@@ -165,6 +170,25 @@ export default class WeekPlannerPlugin extends Plugin {
     } catch (e) {
       console.error("Week Planner maintenance failed", e);
     }
+  }
+
+  /** "Mac", "iPhone"… plus a short id kept per device, so each device has its own log file. */
+  private deviceName(): string {
+    const kind = Platform.isPhone ? "iPhone" : Platform.isTablet ? "iPad" : Platform.isMacOS ? "Mac" : "ПК";
+    let id = this.app.loadLocalStorage("wp-device-id") as string | null;
+    if (!id) {
+      id = Math.random().toString(36).slice(2, 6);
+      this.app.saveLocalStorage("wp-device-id", id);
+    }
+    return `${kind} ${id}`;
+  }
+
+  openLog() {
+    new LogModal(this.app, this).open();
+  }
+
+  async openUnusedAttachments() {
+    new AttachmentsModal(this.app, this, await this.store.findUnusedAttachments()).open();
   }
 
   // ---------- undo toast ----------
@@ -461,6 +485,12 @@ class PlannerSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("Резервные копии").setHeading();
     num("Хранить копии, дней", "Копия задач, привычек и целей делается раз в день в папку Planner/Backups", "backupDays", 3, 365);
+
+    new Setting(containerEl).setName("Обслуживание").setHeading();
+    new Setting(containerEl).setName("Журнал изменений").setDesc("Что, когда и с какого устройства менялось; удалённые задачи можно вернуть")
+      .addButton((b) => b.setButtonText("Открыть").onClick(() => this.plugin.openLog()));
+    new Setting(containerEl).setName("Неиспользуемые вложения").setDesc("Файлы во вложениях, к которым не прикреплена ни одна задача")
+      .addButton((b) => b.setButtonText("Найти").onClick(() => this.plugin.openUnusedAttachments()));
 
     new Setting(containerEl).setName("iPhone").setHeading();
     new Setting(containerEl).setName("Кнопка «+» в нижней панели")
