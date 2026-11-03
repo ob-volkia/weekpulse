@@ -697,3 +697,7 @@ button.wp-danger { color: var(--color-red); }
   .wp-task-modal textarea.wp-task-title { font-size: 18px; }
   .wp-modal button.wp-prop-chip { height: 32px; }
 }
+.wp-task-modal input[type="url"], .wp-task-modal input[type="time"], .wp-task-modal input[type="date"] {
+  background: var(--background-modifier-form-field); border: 1px solid var(--background-modifier-border);
+  border-radius: var(--input-radius, 8px); color: var(--text-normal); padding: 0 10px; height: 32px; font-size: var(--font-ui-small);
+}
