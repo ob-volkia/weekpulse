@@ -572,7 +572,7 @@ export class Store extends Events {
         }
       }
     }, label);
-    this.logAction(label.replace(/:.*$/, ""), String(own.length), removed.flatMap(serializeTask));
+    this.logAction(label.replace(/:.*$/, ""), String(op === "remove" ? removed.length : own.length), removed.flatMap(serializeTask));
   }
 
   async addMany(items: { task: Partial<Task>; due: DateStr | null }[]) {
