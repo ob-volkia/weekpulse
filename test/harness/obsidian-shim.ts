@@ -36,9 +36,14 @@ export class TFolder { children: TFile[] = []; constructor(public path: string) 
 export const normalizePath = (p: string) => p.replace(/\/+/g, "/").replace(/^\/|\/$/g, "");
 export const Platform = { get isPhone() { return (window as any).__phone === true; }, isMobile: false };
 
-const ICONS: Record<string, string> = { "chevron-left": "‹", "chevron-right": "›", plus: "+", eye: "◉", "eye-off": "◎", flame: "🔥", "file-text": "▤", "calendar-days": "▦", repeat: "↻", "list-checks": "☑", check: "✓", "fold-vertical": "≡", "unfold-vertical": "☰" };
-export function setIcon(el: HTMLElement, name: string) { el.textContent = ICONS[name] ?? "•"; }
-
+const ALIAS: Record<string, string> = { "alert-triangle": "triangle-alert", "bar-chart-2": "chart-column", "more-horizontal": "ellipsis", "wand-2": "wand-sparkles", "layout-template": "layout-template", "edit": "pencil" };
+const svgCache = new Map<string, Promise<string>>();
+export function setIcon(el: HTMLElement, name: string) {
+  const n = ALIAS[name] ?? name;
+  if (!svgCache.has(n)) svgCache.set(n, fetch(`https://unpkg.com/lucide-static@0.460.0/icons/${n}.svg`).then((r) => (r.ok ? r.text() : "")).catch(() => ""));
+  el.innerHTML = "";
+  svgCache.get(n)!.then((svg) => { el.innerHTML = svg.replace("<svg", '<svg class="svg-icon"'); });
+}
 export class Notice { constructor(msg: any) { const n = document.createElement("div"); n.className = "notice"; if (typeof msg === "string") n.textContent = msg; else n.appendChild(msg); document.body.appendChild(n); setTimeout(() => n.remove(), 2500); } }
 
 export class Menu {

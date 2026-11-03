@@ -24,6 +24,7 @@ export interface PlannerSettings {
   timelineEnd: number;
   planningPrompt: boolean;
   lastPlannedWeek: string;
+  mobileHintShown: boolean;
 }
 
 export const DEFAULT_SETTINGS: PlannerSettings = {
@@ -47,6 +48,7 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   timelineEnd: 23,
   planningPrompt: true,
   lastPlannedWeek: "",
+  mobileHintShown: false,
 };
 
 export interface Template {

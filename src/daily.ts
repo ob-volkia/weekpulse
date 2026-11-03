@@ -7,6 +7,7 @@ import { DAY_LONG, DateStr, fmtMinutes, humanDay, today, weekday } from "./dates
 import { Task, compareInDay, displayTitle } from "./model";
 import { parseQuick } from "./quickadd";
 import type WeekPlannerPlugin from "./main";
+import { ICON, icon } from "./ui";
 
 export function dailyTemplate(day: DateStr) {
   const name = DAY_LONG[weekday(day) - 1];
@@ -68,7 +69,7 @@ function drawDay(plugin: WeekPlannerPlugin, root: HTMLElement, day: DateStr) {
   head.createSpan({ text: `${done}/${tasks.length} выполнено` });
   const minutes = tasks.filter((t) => !t.done).reduce((s, t) => s + t.duration, 0);
   if (minutes) head.createSpan({ cls: "wp-muted", text: ` · осталось ${fmtMinutes(minutes)}` });
-  const open = head.createEl("a", { text: "Открыть неделю →", cls: "wp-block-link" });
+  const open = head.createEl("a", { text: "Открыть неделю", cls: "wp-block-link" });
   open.onclick = (e) => { e.preventDefault(); plugin.activateWeek(day); };
   if (!tasks.length) root.createDiv({ cls: "wp-muted", text: "Задач на этот день нет" });
   const ul = root.createEl("ul", { cls: "contains-task-list wp-block-list" });
@@ -107,7 +108,8 @@ function drawHabits(plugin: WeekPlannerPlugin, root: HTMLElement, day: DateStr) 
   const row = root.createDiv("wp-block-habits");
   for (const h of habits) {
     const done = store.habits.log.get(day)?.has(h.id) ?? false;
-    const b = row.createEl("button", { cls: `wp-chip-btn ${done ? "is-active" : ""}`, text: `${done ? "✓ " : ""}${h.name}` });
+    const b = row.createEl("button", { cls: `wp-chip-btn ${done ? "is-active" : ""}`, text: h.name });
+    if (done) b.prepend(icon(b, ICON.done));
     b.disabled = day > today();
     b.onclick = () => store.toggleHabit(h.id, day);
   }

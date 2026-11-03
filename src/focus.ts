@@ -1,7 +1,8 @@
-import { Events, ItemView, WorkspaceLeaf, setIcon } from "obsidian";
+import { Events, ItemView, Platform, WorkspaceLeaf, setIcon } from "obsidian";
 import { fmtMinutes, humanDay, today } from "./dates";
 import { Task, compareInDay, displayTitle } from "./model";
 import type WeekPlannerPlugin from "./main";
+import { ICON, iconButton, iconText } from "./ui";
 
 export const VIEW_FOCUS = "week-planner-focus";
 
@@ -102,7 +103,7 @@ export class FocusTimer extends Events {
       }
       const task = this.taskId ? this.plugin.store.find(this.taskId) : null;
       this.plugin.notify(
-        wasWork ? "🍅 Помодоро завершён" : "☕ Перерыв окончен",
+        wasWork ? "Помодоро завершён" : "Перерыв окончен",
         wasWork ? `${task ? displayTitle(task) + " · " : ""}время на перерыв ${this.plugin.settings.breakMinutes} мин` : "Пора возвращаться к работе",
       );
       this.switchPhase();
@@ -215,7 +216,7 @@ export class FocusView extends ItemView {
     const skip = ctl.createEl("button", { text: this.timer.phase === "work" ? "Перерыв" : "Пропустить" });
     skip.onclick = () => { this.timer.skip(); this.render(); };
     if (current && !current.done && !current.source) {
-      const done = ctl.createEl("button", { text: "✓ Готово" });
+      const done = iconButton(ctl, ICON.done, "Готово");
       done.onclick = async () => {
         this.timer.pause();
         await this.plugin.store.toggle(current.id);
@@ -226,15 +227,15 @@ export class FocusView extends ItemView {
     const planned = open.reduce((s, t) => s + t.duration, 0);
     const spent = tasks.reduce((s, t) => s + t.spent, 0);
     const stats = panel.createDiv("wp-focus-stats");
-    stats.createDiv({ text: `🍅 ${this.timer.completedToday}`, attr: { "aria-label": "Помодоро сегодня" } });
-    stats.createDiv({ text: `⏱ ${fmtMinutes(spent) || "0м"}`, attr: { "aria-label": "Потрачено сегодня" } });
-    stats.createDiv({ text: `📋 осталось ${fmtMinutes(planned) || "—"}`, attr: { "aria-label": "Запланировано на остаток дня" } });
-    panel.createDiv({ cls: "wp-hint", text: "Пробел — старт/пауза" });
+    iconText(stats, ICON.pomodoro, String(this.timer.completedToday), "", "Помодоро сегодня");
+    iconText(stats, ICON.spent, fmtMinutes(spent) || "0м", "", "Потрачено сегодня");
+    iconText(stats, ICON.planned, `осталось ${fmtMinutes(planned) || "—"}`, "", "Запланировано на остаток дня");
+    if (!Platform.isMobile) panel.createDiv({ cls: "wp-hint", text: "Пробел — старт/пауза" });
 
     // ----- today's list -----
     const listWrap = page.createDiv("wp-focus-list");
     listWrap.createDiv({ cls: "wp-chart-title", text: `Задачи на сегодня · ${tasks.filter((t) => t.done).length}/${tasks.length}` });
-    if (!tasks.length) listWrap.createDiv({ cls: "wp-empty", text: "На сегодня задач нет ✨" });
+    if (!tasks.length) listWrap.createDiv({ cls: "wp-empty", text: "На сегодня задач нет" });
     for (const t of tasks) {
       const row = listWrap.createDiv({ cls: `wp-focus-item prio-${t.priority}` });
       if (t.done) row.addClass("is-done");
@@ -244,7 +245,7 @@ export class FocusView extends ItemView {
       cb.onclick = (e) => { e.stopPropagation(); this.plugin.store.toggle(t.id); };
       const body = row.createDiv("wp-focus-item-body");
       body.createDiv({ text: displayTitle(t) });
-      const meta = [t.time, t.duration ? fmtMinutes(t.duration) : "", t.spent ? `⏱${fmtMinutes(t.spent)}` : ""].filter(Boolean).join(" · ");
+      const meta = [t.time, t.duration ? fmtMinutes(t.duration) : "", t.spent ? `в фокусе ${fmtMinutes(t.spent)}` : ""].filter(Boolean).join(" · ");
       if (meta) body.createDiv({ cls: "wp-muted", text: meta });
       if (!t.done && !t.source) {
         const play = row.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": "Фокус на этой задаче" } });

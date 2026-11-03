@@ -40,7 +40,7 @@ export function buildReview(store: Store, archive: Task[], weekStart: DateStr): 
   for (const d of days) {
     const list = planned.filter((t) => t.due === d || t.doneDate === d);
     const dn = list.filter((t) => t.done && t.doneDate === d).length;
-    out.push(`- ${humanDay(d)}: ${dn}/${list.length} ${"▮".repeat(dn)}${"▯".repeat(Math.max(0, list.length - dn))}`);
+    out.push(`- ${humanDay(d)}: ${dn}/${list.length}`);
   }
   out.push("");
 
@@ -61,8 +61,8 @@ export function buildReview(store: Store, archive: Task[], weekStart: DateStr): 
   }
 
   out.push("## Переносилось", "");
-  if (!open.length) out.push("_Хвостов нет_ 👍");
-  for (const t of open.sort((a, b) => b.moved - a.moved)) out.push(`- ${displayTitle(t)} — ↪${t.moved}`);
+  if (!open.length) out.push("_Хвостов нет_");
+  for (const t of open.sort((a, b) => b.moved - a.moved)) out.push(`- ${displayTitle(t)} — переносилась ${t.moved} раз(а)`);
   out.push("");
 
   const habits = store.habits.habits;
@@ -71,7 +71,7 @@ export function buildReview(store: Store, archive: Task[], weekStart: DateStr): 
     for (const h of habits) {
       const due = days.filter((d) => d <= today() && store.isHabitDue(h, d));
       const dn = due.filter((d) => store.habits.log.get(d)?.has(h.id)).length;
-      out.push(`- ${h.name}: ${dn}/${due.length} · серия 🔥 ${store.streak(h).current}`);
+      out.push(`- ${h.name}: ${dn}/${due.length} · серия ${store.streak(h).current}`);
     }
     out.push("");
   }

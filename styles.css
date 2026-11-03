@@ -346,7 +346,7 @@ body.wp-is-dragging, body.wp-is-dragging * { cursor: grabbing !important; }
 .wp-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
 .wp-dot.prio-3 { background: var(--wp-p3); } .wp-dot.prio-2 { background: var(--wp-p2); } .wp-dot.prio-1 { background: var(--wp-p1); }
 .wp-dot.is-done { opacity: .3; }
-.wp-root.is-mobile .wp-month-cell { min-height: 54px; }
+
 
 /* mobile head */
 .wp-m-head-right { display: flex; align-items: center; gap: 4px; }
@@ -439,3 +439,122 @@ body.wp-is-dragging, body.wp-is-dragging * { cursor: grabbing !important; }
 /* status bar & notice */
 .wp-status { font-variant-numeric: tabular-nums; }
 .wp-notice-btn { margin-top: 6px; }
+
+/* ======================= v2.1: icons & phone polish ======================= */
+
+.wp-root { position: relative; --wp-bottom-safe: 0px; }
+body.is-phone .wp-root, .wp-root.is-phone-sim { --wp-bottom-safe: calc(env(safe-area-inset-bottom, 0px) + 84px); }
+
+/* icons */
+.wp-ico { display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.wp-ico svg { width: 1em; height: 1em; }
+.wp-icon-text { display: inline-flex; align-items: center; gap: 3px; }
+.wp-meta .wp-ico svg, .wp-meta.wp-icon-text .wp-ico svg { width: 11px; height: 11px; }
+button.wp-icon-text-btn { display: inline-flex; align-items: center; gap: 6px; }
+button.wp-icon-text-btn .wp-ico svg { width: 15px; height: 15px; }
+.wp-root button.wp-chip-btn.wp-icon-text-btn .wp-ico svg, .wp-modal button.wp-chip-btn.wp-icon-text-btn .wp-ico svg { width: 13px; height: 13px; }
+.wp-modal button.wp-square-btn { padding: 0 12px; min-width: 44px; height: 36px; justify-content: center; }
+button.wp-danger { color: var(--color-red); }
+.wp-streak { color: var(--color-orange); font-weight: 600; }
+.wp-streak .wp-ico svg { width: 14px; height: 14px; }
+.wp-moved .wp-ico svg { width: 11px; height: 11px; }
+.wp-pill-count .wp-ico svg { width: 11px; height: 11px; }
+.wp-pill-num .wp-ico svg { width: 18px; height: 18px; }
+.wp-tile-value { display: flex; align-items: center; gap: 4px; }
+.wp-tile-value .wp-ico svg { width: 20px; height: 20px; }
+.wp-stale-text.wp-icon-text, .wp-stale-text .wp-icon-text { align-items: flex-start; gap: 6px; }
+.wp-stale-text .wp-ico { color: var(--color-orange); margin-top: 2px; }
+.wp-modal-note .wp-ico svg { width: 13px; height: 13px; }
+.wp-status { display: inline-flex; align-items: center; gap: 2px; }
+.wp-status .wp-ico svg { width: 13px; height: 13px; }
+.wp-focus-stats .wp-icon-text { gap: 5px; }
+.wp-focus-stats .wp-ico svg { width: 15px; height: 15px; }
+.wp-block-habits .wp-ico svg { width: 12px; height: 12px; }
+
+/* phone toolbar: two rows */
+.wp-m-toolbar { flex-direction: column; align-items: stretch; gap: 6px; }
+.wp-m-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.wp-m-row .wp-week-title { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; }
+.wp-m-row .wp-toolbar-right { margin-left: auto; gap: 0; }
+.wp-root.is-mobile .wp-m-row button.wp-icon-btn { width: 34px; height: 34px; }
+.wp-root.is-mobile .wp-m-row button.wp-icon-btn svg { width: 19px; height: 19px; }
+.wp-root.is-mobile .wp-segmented.wp-mode { flex: none; }
+.wp-root.is-mobile button.wp-seg-btn { height: 28px; padding: 0 12px; font-size: var(--font-ui-small); }
+
+/* phone week progress line */
+.wp-m-progress { height: 3px; border-radius: 2px; background: var(--background-modifier-border); overflow: hidden; flex: none; margin-top: -2px; }
+.wp-m-progress-fill { height: 100%; background: var(--interactive-accent); border-radius: 2px; }
+
+/* phone lists clear the floating bar and the + button */
+.wp-root.is-mobile .wp-m-list { padding-bottom: calc(var(--wp-bottom-safe) + 72px); }
+.wp-root.is-mobile .wp-m-head { flex: none; }
+
+/* floating + */
+.wp-root button.wp-fab {
+  position: absolute; right: 16px; bottom: calc(var(--wp-bottom-safe) + 16px); z-index: 20;
+  width: 52px; height: 52px; border-radius: 50%; padding: 0;
+  background: var(--interactive-accent); color: var(--text-on-accent); box-shadow: var(--shadow-l);
+  display: flex; align-items: center; justify-content: center;
+}
+.wp-root button.wp-fab svg { width: 24px; height: 24px; }
+.wp-root button.wp-fab:active { transform: scale(.94); }
+
+/* phone month: compact grid + day list under it */
+.wp-root.is-mobile .wp-month-wrap { flex: none; }
+.wp-root.is-mobile .wp-month { grid-template-rows: 20px; grid-auto-rows: 46px; gap: 3px; }
+.wp-root.is-mobile .wp-month-cell { min-height: 0; padding: 3px 4px; overflow: hidden; cursor: pointer; }
+.wp-root.is-mobile .wp-month-top .wp-count { display: none; }
+.wp-root.is-mobile .wp-month-num { font-size: var(--font-ui-small); padding: 0; }
+.wp-root.is-mobile .wp-month-cell.is-selected { background: var(--interactive-accent); border-color: var(--interactive-accent); }
+.wp-root.is-mobile .wp-month-cell.is-selected .wp-month-num { color: var(--text-on-accent); }
+.wp-root.is-mobile .wp-month-cell.is-selected .wp-dot { background: var(--text-on-accent); }
+.wp-root.is-mobile .wp-month-dots { padding: 2px 0 0; gap: 2px; }
+.wp-root.is-mobile .wp-dot { width: 5px; height: 5px; }
+
+/* modal: priority dot instead of a clipped border */
+.wp-modal button.wp-prio-btn { border-left: none !important; display: inline-flex; align-items: center; gap: 6px; }
+.wp-prio-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--background-modifier-border-hover); flex: none; }
+.wp-prio-btn.prio-3 .wp-prio-dot { background: var(--color-red); }
+.wp-prio-btn.prio-2 .wp-prio-dot { background: var(--color-orange); }
+.wp-prio-btn.prio-1 .wp-prio-dot { background: var(--color-yellow); }
+.wp-prio-btn.prio--1 .wp-prio-dot { background: var(--text-faint); }
+.wp-modal button.wp-prio-btn.is-active .wp-prio-dot { box-shadow: 0 0 0 2px var(--text-on-accent); }
+.wp-modal input[type="date"], .wp-modal input[type="time"] {
+  display: inline-block; min-width: 150px; height: 34px; line-height: 34px; color: var(--text-normal);
+  -webkit-text-fill-color: var(--text-normal); text-align: left;
+}
+.wp-modal input[type="time"] { min-width: 100px; }
+.wp-modal input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; }
+@media (max-width: 720px) {
+  .wp-field { grid-template-columns: 1fr; gap: 4px; }
+  .wp-modal-grid { gap: 12px; }
+  .wp-modal-footer { flex-wrap: wrap; }
+}
+
+/* phone habit cards */
+.wp-habit-card { border: 1px solid var(--background-modifier-border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--background-secondary); }
+.wp-habit-card-top { display: flex; align-items: center; gap: 8px; }
+.wp-habit-card .wp-habit-name { flex: 1; font-weight: 600; font-size: var(--font-ui-medium); }
+.wp-habit-card .wp-habit-streak { display: flex; align-items: center; gap: 8px; font-size: var(--font-ui-small); }
+.wp-habit-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.wp-habit-day { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.wp-habit-dow { font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+.wp-habit-day.is-today .wp-habit-dow { color: var(--interactive-accent); }
+.wp-habit-day .wp-habit-box { width: 100% !important; max-width: 40px; height: 34px !important; }
+.wp-habit-day.is-today button.wp-habit-box:not(.is-done) { border-color: var(--interactive-accent); }
+.wp-habit-month.is-wide { display: grid; grid-template-columns: repeat(30, 1fr); gap: 2px; }
+.wp-habit-month.is-wide .wp-mini { width: auto; height: 8px; }
+/* not scheduled that day: a quiet dash instead of a dotted box */
+.wp-root button.wp-habit-box.is-off:not(.is-done) { border: none !important; background: transparent; position: relative; opacity: 1; }
+.wp-root button.wp-habit-box.is-off::after { content: ""; position: absolute; left: 30%; right: 30%; top: 50%; height: 2px; border-radius: 1px; background: var(--background-modifier-border-hover); }
+
+/* stats: plan is an outline, done is filled */
+.wp-vbar-track { background: transparent; border: 1.5px solid var(--background-modifier-border-hover); border-bottom: none; box-sizing: border-box; }
+@media (max-width: 720px) {
+  .wp-heatmap { width: 100%; }
+  .wp-heat-col { flex: 1; }
+  .wp-heat-col .wp-heat { width: 100%; height: auto; aspect-ratio: 1; }
+}
+
+/* phone: content clears the floating bar */
+.wp-habits-root .wp-page, .wp-focus-root .wp-focus-page { padding-bottom: var(--wp-bottom-safe); }

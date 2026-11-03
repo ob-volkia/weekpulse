@@ -1,10 +1,11 @@
-import { App, Modal, Notice } from "obsidian";
-import { DAY_SHORT, DateStr, weekday } from "./dates";
-import { PRIORITY_LABEL, Priority, Task, emptyTask, formatDuration, parseDuration, recurrenceLabel, weekOnRule } from "./model";
+import { App, Modal, Notice, Platform } from "obsidian";
+import { DAY_SHORT, DateStr, fmtMinutes, weekday } from "./dates";
+import { PRIORITY_LABEL, Priority, Task, emptyTask, parseDuration, recurrenceLabel, weekOnRule } from "./model";
 import { parseQuick } from "./quickadd";
 import { Store } from "./store";
 import type WeekPlannerPlugin from "./main";
 import { STALE_AT } from "./weekView";
+import { ICON, iconButton, iconText } from "./ui";
 
 const PRIORITIES: Priority[] = [3, 2, 1, 0, -1];
 
@@ -42,7 +43,8 @@ export class TaskModal extends Modal {
         this.save();
       }
     });
-    setTimeout(() => title.focus(), 10);
+    // On a phone the keyboard would cover half the form when just viewing a task.
+    if (this.isNew || !Platform.isMobile) setTimeout(() => title.focus(), 10);
 
     const grid = c.createDiv("wp-modal-grid");
     const field = (label: string) => {
@@ -67,21 +69,23 @@ export class TaskModal extends Modal {
     const time = timeCtl.createEl("input", { attr: { type: "time" } });
     time.value = t.time ?? "";
     time.addEventListener("change", () => (t.time = time.value || null));
-    const dur = timeCtl.createEl("input", { cls: "wp-dur", attr: { type: "text", placeholder: "1ч 30м" } });
-    dur.value = t.duration ? formatDuration(t.duration) : "";
+    const dur = timeCtl.createEl("input", { cls: "wp-dur", attr: { type: "text", placeholder: "длит." } });
+    dur.value = t.duration ? fmtMinutes(t.duration) : "";
     dur.addEventListener("change", () => (t.duration = parseDuration(dur.value)));
     for (const m of [15, 30, 60, 120]) {
       const b = timeCtl.createEl("button", { text: m < 60 ? `${m}м` : `${m / 60}ч`, cls: "wp-chip-btn" });
       b.onclick = () => {
         t.duration = m;
-        dur.value = formatDuration(m);
+        dur.value = fmtMinutes(m);
       };
     }
 
     // priority
     const prCtl = field("Приоритет").createDiv("wp-segmented");
     for (const p of PRIORITIES) {
-      const b = prCtl.createEl("button", { text: PRIORITY_LABEL[p], cls: `wp-prio-btn prio-${p}` });
+      const b = prCtl.createEl("button", { cls: `wp-prio-btn prio-${p}` });
+      b.createSpan({ cls: "wp-prio-dot" });
+      b.createSpan({ text: PRIORITY_LABEL[p] });
       if (t.priority === p) b.addClass("is-active");
       b.onclick = () => {
         t.priority = p;
@@ -171,13 +175,13 @@ export class TaskModal extends Modal {
       }
     });
 
-    if (t.moved && t.moved < STALE_AT) c.createDiv({ cls: "wp-modal-note", text: `↪ Переносилась ${t.moved} раз(а)` });
-    if (t.spent) c.createDiv({ cls: "wp-modal-note is-muted", text: `⏱ В фокусе: ${formatDuration(t.spent).replace("h", "ч ").replace("m", "м")}` });
+    if (t.moved && t.moved < STALE_AT) iconText(c.createDiv("wp-modal-note"), ICON.moved, `Переносилась ${t.moved} раз(а)`);
+    if (t.spent) iconText(c.createDiv("wp-modal-note is-muted"), ICON.spent, `В фокусе: ${fmtMinutes(t.spent)}`);
 
     // buttons
     const footer = c.createDiv("wp-modal-footer");
     if (!this.isNew) {
-      const del = footer.createEl("button", { text: "Удалить", cls: "mod-warning" });
+      const del = iconButton(footer, "trash-2", "", "wp-square-btn wp-danger", "Удалить");
       del.onclick = async () => {
         await this.store.remove(t.id);
         new Notice("Задача удалена");
@@ -185,7 +189,7 @@ export class TaskModal extends Modal {
       };
     }
     if (!this.isNew && !t.done) {
-      const focus = footer.createEl("button", { text: "▶ Фокус" });
+      const focus = iconButton(footer, ICON.focus, "", "wp-square-btn", "Фокус на задаче");
       focus.onclick = () => {
         this.close();
         this.plugin.activateFocus(t.id);
@@ -199,7 +203,7 @@ export class TaskModal extends Modal {
   private renderStaleBanner(c: HTMLElement) {
     const t = this.draft;
     const b = c.createDiv("wp-stale-banner");
-    b.createDiv({ cls: "wp-stale-text", text: `⚠️ Задача переносилась ${t.moved} раз. Похоже, она слишком большая или уже не нужна.` });
+    iconText(b.createDiv("wp-stale-text"), ICON.stale, `Задача переносилась ${t.moved} раз. Похоже, она слишком большая или уже не нужна.`);
     const actions = b.createDiv("wp-stale-actions");
     const act = (label: string, fn: () => void | Promise<void>) => {
       const btn = actions.createEl("button", { text: label, cls: "wp-chip-btn" });

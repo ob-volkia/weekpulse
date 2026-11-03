@@ -50,13 +50,14 @@ const container = document.getElementById("app")!;
 let view: any;
 async function show(kind: string) {
   container.innerHTML = "";
-  container.className = "";
+  container.className = innerWidth < 720 ? "is-phone-sim" : "";
   const V: any = kind === "week" ? WeekView : kind === "focus" ? FocusView : HabitsView;
   view = new V({ container, app } as any, plugin);
   // registerEvent is a no-op in the shim; subscribe directly.
   (view as any).registerEvent = () => {};
   store.on("changed", () => view.render());
   await view.onOpen();
+  if (innerWidth < 720) container.addClass("is-phone-sim");
 }
 (async () => {
   await store.init();

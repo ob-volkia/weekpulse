@@ -10,6 +10,7 @@ import { PlanningModal } from "./planning";
 import { buildReview, reviewPath } from "./review";
 import { DEFAULT_SETTINGS, PlannerSettings, Store } from "./store";
 import { VIEW_WEEK, WeekView } from "./weekView";
+import { ICON, icon } from "./ui";
 
 export default class WeekPlannerPlugin extends Plugin {
   settings!: PlannerSettings;
@@ -96,7 +97,7 @@ export default class WeekPlannerPlugin extends Plugin {
         const n = await this.store.rollover();
         if (n) {
           const stale = this.store.tasks().filter((t) => !t.done && t.moved >= 5).length;
-          new Notice(`↪ Перенесено на сегодня: ${n}${stale ? `\n⚠️ ${stale} задач переносятся 5+ раз — загляни в них` : ""}`, 8000);
+          new Notice(`Перенесено на сегодня: ${n}${stale ? `\n${stale} задач переносятся 5+ раз — загляни в них` : ""}`, 8000);
         }
       }
       await this.store.archiveOld();
@@ -146,7 +147,9 @@ export default class WeekPlannerPlugin extends Plugin {
     this.statusEl.show();
     const task = f.taskId ? this.store.find(f.taskId) : null;
     const name = task ? displayTitle(task) : "";
-    this.statusEl.setText(`${f.phase === "work" ? "🍅" : "☕"} ${fmtClock(f.left)}${f.running ? "" : " ⏸"}${name ? " · " + (name.length > 28 ? name.slice(0, 27) + "…" : name) : ""}`);
+    this.statusEl.empty();
+    icon(this.statusEl, f.phase === "work" ? ICON.pomodoro : "coffee");
+    this.statusEl.createSpan({ text: ` ${fmtClock(f.left)}${f.running ? "" : " · пауза"}${name ? " · " + (name.length > 28 ? name.slice(0, 27) + "…" : name) : ""}` });
   }
 
   // ---------- planning prompt ----------
@@ -287,7 +290,7 @@ class PlannerSettingTab extends PluginSettingTab {
     text("Папка архива", "Сюда уходят старые выполненные задачи", "archiveFolder");
     text("Папка итогов недели", "Заметки «Итоги недели»", "reviewsFolder");
     text("Папка заметок дня", "Куда создавать заметки дня", "dailyFolder");
-    toggle("Задачи из всех заметок", "Показывать в неделе задачи с датой 📅 из любых заметок хранилища", "scanVault");
+    toggle("Задачи из всех заметок", "Показывать в неделе задачи с датой (📅 ГГГГ-ММ-ДД, формат плагина Tasks) из любых заметок хранилища", "scanVault");
 
     new Setting(containerEl).setName("Планирование").setHeading();
     toggle("Автоперенос невыполненного", "Невыполненные задачи прошлых дней сами переезжают на сегодня", "autoRollover");

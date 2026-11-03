@@ -1,9 +1,10 @@
-import { ItemView, Menu, Modal, App, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, Menu, Modal, App, Platform, WorkspaceLeaf, setIcon } from "obsidian";
 import { DAY_SHORT, DateStr, addDays, dayNum, fmtMinutes, humanDay, startOfWeek, today, weekDays, weekLabel, weekday } from "./dates";
 import { Task, newId, projectOf } from "./model";
 import { Habit, Store } from "./store";
 import { tagColor } from "./weekView";
 import type WeekPlannerPlugin from "./main";
+import { ICON, icon, iconButton, iconText } from "./ui";
 
 export const VIEW_HABITS = "week-planner-habits";
 
@@ -60,16 +61,17 @@ export class HabitsView extends ItemView {
     const sec = page.createDiv("wp-section");
     const h = sec.createDiv("wp-section-head");
     h.createEl("h3", { text: "Привычки" });
-    const add = h.createEl("button", { cls: "wp-chip-btn", text: "+ Привычка" });
+    const add = iconButton(h, "plus", "Привычка", "wp-chip-btn");
     add.onclick = () => new HabitModal(this.app, this.store, null).open();
 
     const habits = this.store.habits.habits;
     if (!habits.length) {
-      sec.createDiv({ cls: "wp-empty", text: "Добавь первую привычку — например «💧 Вода» или «🏃 Пробежка»" });
+      sec.createDiv({ cls: "wp-empty", text: "Добавь первую привычку — например «Вода» или «Пробежка»" });
       return;
     }
     const days = weekDays(this.weekStart);
     const now = today();
+    if (Platform.isPhone || this.contentEl.clientWidth < 720) return this.renderHabitCards(sec, habits, days);
     const table = sec.createDiv("wp-habit-table");
     const head = table.createDiv("wp-habit-row is-head");
     head.createDiv({ cls: "wp-habit-name", text: "" });
@@ -87,24 +89,61 @@ export class HabitsView extends ItemView {
       name.addEventListener("contextmenu", (e) => { e.preventDefault(); this.habitMenu(habit).showAtMouseEvent(e); });
       for (const d of days) {
         const cell = row.createDiv("wp-habit-cell");
-        const due = this.store.isHabitDue(habit, d);
-        const done = this.store.habits.log.get(d)?.has(habit.id) ?? false;
-        const box = cell.createEl("button", { cls: "wp-habit-box", attr: { "aria-label": `${habit.name}, ${humanDay(d)}` } });
-        if (done) { box.addClass("is-done"); setIcon(box, "check"); }
-        if (!due) box.addClass("is-off");
-        if (d > now) box.addClass("is-future");
         if (d === now) cell.addClass("is-today");
-        box.onclick = () => { if (d <= now) this.store.toggleHabit(habit.id, d); };
+        this.habitBox(cell, habit, d);
       }
       const { current, best } = this.store.streak(habit);
       const st = row.createDiv({ cls: "wp-habit-streak", attr: { "aria-label": `Лучшая серия: ${best}` } });
-      st.createSpan({ text: current ? `🔥 ${current}` : "—" });
+      if (current) iconText(st, ICON.streak, String(current), "wp-streak");
+      else st.createSpan({ text: "—" });
       st.createSpan({ cls: "wp-muted", text: ` / ${best}` });
       const month = row.createDiv("wp-habit-month");
       for (let i = 29; i >= 0; i--) {
         const d = addDays(now, -i);
         const done = this.store.habits.log.get(d)?.has(habit.id);
         const sq = month.createDiv({ cls: "wp-mini", attr: { "aria-label": `${humanDay(d)}: ${done ? "выполнено" : "нет"}` } });
+        if (done) sq.addClass("is-done");
+        else if (!this.store.isHabitDue(habit, d)) sq.addClass("is-off");
+      }
+    }
+  }
+
+  private habitBox(parent: HTMLElement, habit: Habit, d: DateStr) {
+    const now = today();
+    const due = this.store.isHabitDue(habit, d);
+    const done = this.store.habits.log.get(d)?.has(habit.id) ?? false;
+    const box = parent.createEl("button", { cls: "wp-habit-box", attr: { "aria-label": `${habit.name}, ${humanDay(d)}` } });
+    if (done) { box.addClass("is-done"); setIcon(box, "check"); }
+    if (!due && !done) box.addClass("is-off");
+    if (d > now) box.addClass("is-future");
+    box.onclick = () => { if (d <= now) this.store.toggleHabit(habit.id, d); };
+    return box;
+  }
+
+  /** Phone: one card per habit — name and streak, then the week, then 30 days. */
+  private renderHabitCards(sec: HTMLElement, habits: Habit[], days: DateStr[]) {
+    const now = today();
+    for (const habit of habits) {
+      const card = sec.createDiv("wp-habit-card");
+      const top = card.createDiv("wp-habit-card-top");
+      const name = top.createDiv({ cls: "wp-habit-name", text: habit.name });
+      name.addEventListener("click", (e) => this.habitMenu(habit).showAtMouseEvent(e));
+      const { current, best } = this.store.streak(habit);
+      const st = top.createDiv({ cls: "wp-habit-streak", attr: { "aria-label": `Текущая серия ${current}, лучшая ${best}` } });
+      iconText(st, ICON.streak, String(current), current ? "wp-streak" : "wp-muted");
+      st.createSpan({ cls: "wp-muted", text: `лучшая ${best}` });
+      const week = card.createDiv("wp-habit-week");
+      for (const d of days) {
+        const col = week.createDiv("wp-habit-day");
+        if (d === now) col.addClass("is-today");
+        col.createDiv({ cls: "wp-habit-dow", text: DAY_SHORT[weekday(d) - 1] });
+        this.habitBox(col, habit, d);
+      }
+      const month = card.createDiv("wp-habit-month is-wide");
+      for (let i = 29; i >= 0; i--) {
+        const d = addDays(now, -i);
+        const done = this.store.habits.log.get(d)?.has(habit.id);
+        const sq = month.createDiv("wp-mini");
         if (done) sq.addClass("is-done");
         else if (!this.store.isHabitDue(habit, d)) sq.addClass("is-off");
       }
@@ -125,7 +164,7 @@ export class HabitsView extends ItemView {
     const sec = page.createDiv("wp-section");
     const sh = sec.createDiv("wp-section-head");
     sh.createEl("h3", { text: "Статистика недели" });
-    const rv = sh.createEl("button", { cls: "wp-chip-btn", text: "📊 Итоги недели" });
+    const rv = iconButton(sh, ICON.review, "Итоги недели", "wp-chip-btn");
     rv.onclick = () => this.plugin.createReview(this.weekStart);
     const days = weekDays(this.weekStart);
     const all = [...this.store.all(), ...this.archive];
@@ -142,6 +181,7 @@ export class HabitsView extends ItemView {
       t.createDiv({ cls: "wp-tile-label", text: label });
       t.createDiv({ cls: "wp-tile-value", text: value });
       if (sub) t.createDiv({ cls: "wp-tile-sub", text: sub });
+      return t;
     };
     tile("Выполнено", inWeek.length ? `${Math.round((done.length / inWeek.length) * 100)}%` : "—", `${done.length} из ${inWeek.length} задач`);
     tile("Время в работе", fmtMinutes(minutesDone) || "0", minutesPlanned ? `из ${fmtMinutes(minutesPlanned)} запланированных` : "длительность не указана");
@@ -150,9 +190,10 @@ export class HabitsView extends ItemView {
     const est = tracked.reduce((s, t) => s + t.duration, 0);
     tile("План / факт (фокус)", spent ? `${fmtMinutes(est) || "—"} / ${fmtMinutes(spent)}` : "—",
       spent && est ? (spent > est ? `недооценка на ${Math.round((spent / est - 1) * 100)}%` : `уложился, запас ${Math.round((1 - spent / est) * 100)}%`) : "запускай помодоро, чтобы считать факт");
-    tile("Переносились", String(moved), moved ? "задач сдвигались хотя бы раз" : "ничего не откладывали 👍");
+    tile("Переносились", String(moved), moved ? "задач сдвигались хотя бы раз" : "ничего не откладывали");
     const bestHabit = this.store.habits.habits.map((h) => ({ h, s: this.store.streak(h).current })).sort((a, b) => b.s - a.s)[0];
-    tile("Лучшая серия", bestHabit?.s ? `🔥 ${bestHabit.s}` : "—", bestHabit?.s ? bestHabit.h.name : "привычек пока нет");
+    const bt = tile("Лучшая серия", bestHabit?.s ? String(bestHabit.s) : "—", bestHabit?.s ? bestHabit.h.name : "привычек пока нет");
+    if (bestHabit?.s) bt.querySelector(".wp-tile-value")!.prepend(icon(bt, ICON.streak, "wp-streak"));
 
     // per-day bars: done vs planned (one series: done; the track is the plan)
     const chart = sec.createDiv("wp-chart");
@@ -252,7 +293,7 @@ export class HabitsView extends ItemView {
       for (const t of stale) {
         const r = sc.createDiv("wp-stale-row");
         r.createSpan({ text: t.title });
-        r.createSpan({ cls: "wp-moved", text: `↪${t.moved}` });
+        iconText(r, ICON.moved, String(t.moved), "wp-moved");
       }
     }
   }
@@ -267,7 +308,7 @@ class HabitModal extends Modal {
     this.modalEl.addClass("wp-modal");
     this.titleEl.setText(this.habit ? "Привычка" : "Новая привычка");
     const c = this.contentEl;
-    const name = c.createEl("input", { cls: "wp-modal-title", attr: { type: "text", placeholder: "💧 Пить воду" } });
+    const name = c.createEl("input", { cls: "wp-modal-title", attr: { type: "text", placeholder: "Пить воду" } });
     name.value = this.habit?.name ?? "";
     setTimeout(() => name.focus(), 10);
     c.createDiv({ cls: "wp-field-label", text: "Дни (ничего не выбрано — каждый день)" });

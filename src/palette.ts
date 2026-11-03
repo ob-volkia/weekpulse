@@ -39,7 +39,7 @@ export class TaskPalette extends FuzzySuggestModal<Task> {
     el.createDiv({ cls: `wp-palette-prio prio-${t.priority}` });
     const body = el.createDiv("wp-palette-body");
     body.createDiv({ cls: "wp-palette-title", text: displayTitle(t) });
-    const meta = [t.due ? humanDay(t.due) : "бэклог", t.time ?? "", ...t.tags.map((x) => "#" + x), t.source ? `📄 ${t.source.path}` : ""].filter(Boolean);
+    const meta = [t.due ? humanDay(t.due) : "бэклог", t.time ?? "", ...t.tags.map((x) => "#" + x), t.source ? `из ${t.source.path.replace(/\.md$/, "")}` : ""].filter(Boolean);
     body.createDiv({ cls: "wp-muted", text: meta.join(" · ") });
   }
 

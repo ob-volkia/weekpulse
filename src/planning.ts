@@ -3,6 +3,7 @@ import { DAY_SHORT, DateStr, addDays, dayNum, fmtMinutes, isoWeek, today, weekDa
 import { DragController } from "./drag";
 import { Task, displayTitle } from "./model";
 import type WeekPlannerPlugin from "./main";
+import { ICON, iconButton, iconText } from "./ui";
 
 /** Weekly planning: spread leftovers and backlog over the days, watching each day's load. */
 export class PlanningModal extends Modal {
@@ -50,7 +51,7 @@ export class PlanningModal extends Modal {
 
     const intro = c.createDiv("wp-plan-intro");
     intro.createSpan({ text: "Перетащи задачи из левой колонки на дни. Полоска показывает загрузку дня относительно " + `${this.plugin.settings.dayCapacityHours}ч.` });
-    const prevReview = intro.createEl("button", { cls: "wp-chip-btn", text: "📊 Итоги прошлой недели" });
+    const prevReview = iconButton(intro, ICON.review, "Итоги прошлой недели", "wp-chip-btn");
     prevReview.onclick = () => this.plugin.createReview(addDays(this.weekStart, -7));
 
     const body = c.createDiv("wp-plan-body");
@@ -62,7 +63,7 @@ export class PlanningModal extends Modal {
       if (!list.length) pool.createDiv({ cls: "wp-muted wp-plan-empty", text: hint });
       for (const t of list) this.card(pool, t, true);
     };
-    section("Хвосты (переносились)", leftovers, "Хвостов нет 👍");
+    section("Хвосты (переносились)", leftovers, "Хвостов нет");
     section("Бэклог", backlog, "Бэклог пуст");
     pool.createDiv("wp-list-end");
     pool.scrollTop = scrollTop;
@@ -109,7 +110,7 @@ export class PlanningModal extends Modal {
     if (full) {
       const meta = body.createDiv("wp-card-meta");
       if (t.duration) meta.createSpan({ cls: "wp-meta", text: fmtMinutes(t.duration) });
-      if (t.moved) meta.createSpan({ cls: "wp-meta wp-moved", text: `↪${t.moved}` });
+      if (t.moved) iconText(meta, ICON.moved, String(t.moved), "wp-meta wp-moved");
       for (const tag of t.tags) meta.createSpan({ cls: "wp-meta", text: "#" + tag });
     } else if (t.duration) {
       row.createSpan({ cls: "wp-meta", text: fmtMinutes(t.duration) });

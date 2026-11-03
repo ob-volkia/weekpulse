@@ -8,6 +8,7 @@ import { PRIORITY_LABEL, Priority, Task, compareInDay, displayTitle, projectOf, 
 import { TaskModal } from "./modal";
 import { parseQuick } from "./quickadd";
 import type WeekPlannerPlugin from "./main";
+import { ICON, icon, iconText } from "./ui";
 
 export const VIEW_WEEK = "week-planner-view";
 const BACKLOG = "backlog";
@@ -65,7 +66,7 @@ export class WeekView extends ItemView {
         else {
           const base = t.due && t.due > today() ? t.due : today();
           this.store.move(id, addDays(base, 1), null);
-          new Notice(`«${displayTitle(t)}» → завтра`);
+          new Notice(`«${displayTitle(t)}» перенесена на завтра`);
         }
       },
     });
@@ -262,7 +263,55 @@ export class WeekView extends ItemView {
     return b;
   }
 
+  private renderMobileToolbar(root: HTMLElement, mode: Mode) {
+    const bar = root.createDiv("wp-toolbar wp-m-toolbar");
+    const row1 = bar.createDiv("wp-m-row");
+    this.iconBtn(row1, "chevron-left", "Назад", () => this.shift(-1));
+    row1.createEl("button", { text: "Сегодня", cls: "wp-today-btn" }).onclick = () => this.goToday();
+    this.iconBtn(row1, "chevron-right", "Вперёд", () => this.shift(1));
+    const title = row1.createDiv("wp-week-title");
+    if (mode === "month") {
+      const a = parse(this.monthAnchor());
+      title.setText(`${MONTH_NOM[a.getMonth()]} ${a.getFullYear()}`);
+    } else {
+      title.createSpan({ text: weekLabel(this.weekStart) });
+      title.createSpan({ cls: "wp-week-num", text: `W${isoWeek(this.weekStart)}` });
+    }
+    const row2 = bar.createDiv("wp-m-row");
+    const seg = row2.createDiv("wp-segmented wp-mode");
+    for (const [m, label] of [["week", "Неделя"], ["month", "Месяц"]] as [Mode, string][]) {
+      const b = seg.createEl("button", { text: label, cls: "wp-seg-btn" });
+      if (mode === m) b.addClass("is-active");
+      b.onclick = () => this.setMode(m);
+    }
+    if (this.tagFilter) {
+      const chip = row2.createEl("button", { cls: `wp-chip-btn wp-filter-btn is-active tag-c${tagColor(this.tagFilter)}`, text: `#${this.tagFilter}` });
+      chip.onclick = () => { this.tagFilter = null; this.render(); };
+    }
+    const icons = row2.createDiv("wp-toolbar-right");
+    this.iconBtn(icons, "search", "Найти задачу", () => this.plugin.openPalette());
+    this.iconBtn(icons, "wand-2", "Спланировать неделю", () => this.plugin.openPlanning(this.weekStart));
+    this.iconBtn(icons, "timer", "Фокус", () => this.plugin.activateFocus(), this.plugin.focus.running ? "is-running" : "");
+    this.iconBtn(icons, "flame", "Привычки и статистика", () => this.plugin.activateHabits());
+    this.iconBtn(icons, "more-horizontal", "Ещё", (e) => this.moreMenu(e));
+  }
+
+  private moreMenu(e: MouseEvent) {
+    const m = new Menu();
+    const tags = this.store.allTags();
+    if (tags.length) {
+      m.addItem((i) => i.setTitle("Все теги").setIcon("tags").setChecked(!this.tagFilter).onClick(() => { this.tagFilter = null; this.render(); }));
+      for (const t of tags) m.addItem((i) => i.setTitle("#" + t).setChecked(this.tagFilter === t).onClick(() => { this.tagFilter = t; this.render(); }));
+      m.addSeparator();
+    }
+    m.addItem((i) => i.setTitle(this.settings.showDone ? "Скрыть выполненные" : "Показать выполненные").setIcon(this.settings.showDone ? "eye-off" : "eye").onClick(() => this.toggleDone()));
+    m.addItem((i) => i.setTitle("Шаблоны…").setIcon("layout-template").onClick(() => this.templatesMenu(e)));
+    m.addItem((i) => i.setTitle("Открыть файл задач").setIcon("file-text").onClick(() => this.openTasksFile()));
+    m.showAtMouseEvent(e);
+  }
+
   private renderToolbar(root: HTMLElement, mode: Mode) {
+    if (this.mobile) return this.renderMobileToolbar(root, mode);
     const bar = root.createDiv("wp-toolbar");
     const nav = bar.createDiv("wp-nav");
     const unit = mode === "month" ? "месяц" : "неделя";
@@ -548,16 +597,25 @@ export class WeekView extends ItemView {
         if (st.total) top.createSpan({ cls: "wp-count", text: `${st.done}/${st.total}` });
         const tasks = this.tasksFor(d);
         if (this.mobile) {
+          if (d === this.selected) cell.addClass("is-selected");
           const dots = cell.createDiv("wp-month-dots");
-          for (const t of tasks.slice(0, 6)) dots.createDiv({ cls: `wp-dot prio-${t.priority} ${t.done ? "is-done" : ""}` });
-          cell.onclick = () => this.showWeekOf(d);
+          for (const t of tasks.slice(0, 5)) dots.createDiv({ cls: `wp-dot prio-${t.priority} ${t.done ? "is-done" : ""}` });
+          cell.onclick = () => {
+            this.selected = d;
+            this.render();
+          };
         } else {
           for (const t of tasks) this.renderCard(cell, t, true);
           cell.createDiv("wp-list-end");
         }
       }
     }
-    grid.style.gridTemplateRows = `auto repeat(${weeks}, 1fr)`;
+    grid.style.gridTemplateRows = this.mobile ? "" : `auto repeat(${weeks}, 1fr)`;
+    if (this.mobile) {
+      // Below the grid: the tapped day (defaults to today).
+      if (this.selected === BACKLOG || this.selected.slice(0, 7) !== month) this.selected = now.slice(0, 7) === month ? now : anchor;
+      this.renderDayList(root, this.selected);
+    }
   }
 
   // ---------- cards ----------
@@ -588,9 +646,9 @@ export class WeekView extends ItemView {
       const meta = body.createDiv("wp-card-meta");
       if (t.time) meta.createSpan({ cls: "wp-meta wp-time", text: t.time });
       if (t.duration) meta.createSpan({ cls: "wp-meta", text: fmtMinutes(t.duration) });
-      if (t.spent) meta.createSpan({ cls: "wp-meta wp-spent", text: `⏱${fmtMinutes(t.spent)}`, attr: { "aria-label": "Потрачено в фокусе" } });
+      if (t.spent) iconText(meta, ICON.spent, fmtMinutes(t.spent), "wp-meta wp-spent", "Потрачено в фокусе");
       if (t.recurrence) setIcon(meta.createSpan({ cls: "wp-meta wp-icon-meta", attr: { "aria-label": recurrenceLabel(t.recurrence) } }), "repeat");
-      if (t.moved) meta.createSpan({ cls: "wp-meta wp-moved", text: `↪${t.moved}`, attr: { "aria-label": `Переносилась ${t.moved} раз(а)` } });
+      if (t.moved) iconText(meta, ICON.moved, String(t.moved), "wp-meta wp-moved", `Переносилась ${t.moved} раз(а)`);
       if (overdue) meta.createSpan({ cls: "wp-meta wp-overdue", text: `с ${humanDay(t.due!)}` });
       if (t.subtasks.length) {
         const done = t.subtasks.filter((s) => s.done).length;
@@ -692,18 +750,20 @@ export class WeekView extends ItemView {
   private renderMobile(root: HTMLElement) {
     const strip = root.createDiv("wp-strip");
     const now = today();
-    const mk = (key: string, label: string, sub: string, date: DateStr | null) => {
+    const mk = (key: string, label: string, date: DateStr | null) => {
       const pill = strip.createDiv({ cls: "wp-pill", attr: { "data-drop": key } });
       if ((date ?? BACKLOG) === this.selected) pill.addClass("is-selected");
       if (date === now) pill.addClass("is-today");
       if (date && date < now) pill.addClass("is-past");
       pill.createDiv({ cls: "wp-pill-label", text: label });
-      pill.createDiv({ cls: "wp-pill-num", text: sub });
+      const num = pill.createDiv("wp-pill-num");
+      if (date) num.setText(String(dayNum(date)));
+      else icon(num, ICON.backlog);
       const st = this.dayStats(date);
       const open = st.total - st.done;
       const dot = pill.createDiv("wp-pill-count");
       if (st.total && !open) {
-        dot.setText("✓");
+        icon(dot, ICON.done);
         dot.addClass("is-clear");
       } else if (open) dot.setText(String(open));
       pill.onclick = () => {
@@ -711,10 +771,25 @@ export class WeekView extends ItemView {
         this.render();
       };
     };
-    for (const d of weekDays(this.weekStart)) mk(d, DAY_SHORT[weekday(d) - 1], String(dayNum(d)), d);
-    mk(BACKLOG, "Бэкл", "∞", null);
+    for (const d of weekDays(this.weekStart)) mk(d, DAY_SHORT[weekday(d) - 1], d);
+    mk(BACKLOG, "Бэкл", null);
+    this.renderWeekProgress(root);
+    this.renderDayList(root, this.selected === BACKLOG ? null : this.selected);
+  }
 
-    const day = this.selected === BACKLOG ? null : this.selected;
+  /** Thin week-progress line (mobile). */
+  private renderWeekProgress(root: HTMLElement) {
+    const days = weekDays(this.weekStart);
+    const weekTasks = this.store.all().filter((t) => t.due && t.due >= days[0] && t.due <= days[6]);
+    const done = weekTasks.filter((t) => t.done).length;
+    const pct = weekTasks.length ? Math.round((done / weekTasks.length) * 100) : 0;
+    const line = root.createDiv({ cls: "wp-m-progress", attr: { "aria-label": `Неделя: ${done} из ${weekTasks.length}` } });
+    line.createDiv({ cls: "wp-m-progress-fill", attr: { style: `width:${pct}%` } });
+  }
+
+  /** Mobile: the selected day's header, quick add and task list. */
+  private renderDayList(root: HTMLElement, day: DateStr | null) {
+    const now = today();
     const head = root.createDiv("wp-m-head");
     const st = this.dayStats(day);
     if (day) {
@@ -723,15 +798,29 @@ export class WeekView extends ItemView {
       t.onclick = () => this.plugin.openDaily(day);
     } else head.createDiv({ cls: "wp-m-title", text: "Бэклог" });
     const right = head.createDiv("wp-m-head-right");
-    right.createSpan({ cls: "wp-muted", text: [st.total ? `${st.done}/${st.total}` : "Пусто", st.minutes ? fmtMinutes(st.minutes) : ""].filter(Boolean).join(" · ") });
+    right.createSpan({ cls: "wp-muted", text: [st.total ? `${st.done}/${st.total}` : "", st.minutes ? fmtMinutes(st.minutes) : ""].filter(Boolean).join(" · ") });
     if (day) this.iconBtn(right, "more-horizontal", "Действия с днём", (e) => this.dayMenu(e, day));
 
-    this.renderQuickAdd(root, day, "mobile", "Добавить: 14:00 1ч #тег !! …");
-    const list = root.createDiv({ cls: "wp-list wp-m-list wp-scroll-y", attr: { "data-drop": day ?? BACKLOG, "data-drop-list": "", "data-scroll-key": "mobile" } });
+    const list = root.createDiv({ cls: "wp-list wp-m-list wp-scroll-y", attr: { "data-drop": day ?? BACKLOG, "data-drop-list": "", "data-scroll-key": `mobile-${this.mode}` } });
     const tasks = this.tasksFor(day);
     for (const t of tasks) this.renderCard(list, t);
-    if (!tasks.length) list.createDiv({ cls: "wp-empty", text: day === now ? "На сегодня всё чисто ✨" : "Нет задач" });
+    if (!tasks.length) list.createDiv({ cls: "wp-empty", text: day === now ? "На сегодня всё чисто" : "Нет задач" });
     list.createDiv("wp-list-end");
-    root.createDiv({ cls: "wp-hint", text: "Удерживай задачу, чтобы перетащить на другой день · свайп → завтра · свайп ← готово" });
+    this.renderFab(root, day);
+    this.maybeShowHint();
+  }
+
+  /** Floating "+" above Obsidian's bottom bar (phone). */
+  private renderFab(root: HTMLElement, day: DateStr | null) {
+    const fab = root.createEl("button", { cls: "wp-fab", attr: { "aria-label": "Новая задача" } });
+    setIcon(fab, "plus");
+    fab.onclick = () => new TaskModal(this.app, this.plugin, null, day).open();
+  }
+
+  private maybeShowHint() {
+    if (this.settings.mobileHintShown) return;
+    this.settings.mobileHintShown = true;
+    this.plugin.saveSettings();
+    new Notice("Удерживай задачу и перетащи на день в верхней полосе.\nСвайп вправо — на завтра, влево — выполнено.", 12_000);
   }
 }
