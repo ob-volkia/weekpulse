@@ -131,9 +131,17 @@ export default class WeekPlannerPlugin extends Plugin {
 
   setupNavbarButton() {
     if (!Platform.isPhone) return;
-    if (!this.settings.navbarButton) return removeNavbarButton();
+    if (!this.settings.navbarButton) {
+      removeNavbarButton();
+      this.store.trigger("changed");
+      return;
+    }
     const inject = () => {
-      if (this.settings.navbarButton) injectNavbarButton(() => new TaskModal(this.app, this, null, today()).open());
+      if (!this.settings.navbarButton) return;
+      const had = !!document.querySelector(".wp-navbar-add");
+      const ok = injectNavbarButton(() => new TaskModal(this.app, this, null, today()).open());
+      // Views decide whether to show their own floating "+"; let them re-check.
+      if (ok && !had) this.store.trigger("changed");
     };
     inject();
     if (this.navbarWatching) return;
