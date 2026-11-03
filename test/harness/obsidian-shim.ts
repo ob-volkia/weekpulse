@@ -19,11 +19,16 @@ P.removeClass = function (...c: string[]) { this.classList.remove(...c); };
 P.toggleClass = function (c: string, v: boolean) { this.classList.toggle(c, v); };
 P.hasClass = function (c: string) { return this.classList.contains(c); };
 P.setText = function (t: string) { this.textContent = t; };
+P.show = function () { this.style.display = ""; };
+P.hide = function () { this.style.display = "none"; };
+(DocumentFragment.prototype as any).createDiv = P.createDiv;
+(DocumentFragment.prototype as any).createEl = P.createEl;
 (window as any).createDiv = (o?: Attrs | string) => applyOpts(document.createElement("div"), o);
 
 export class Events {
   private h = new Map<string, Function[]>();
   on(n: string, f: Function) { this.h.set(n, [...(this.h.get(n) ?? []), f]); return { n, f }; }
+  offref(r: { n: string; f: Function }) { this.h.set(r.n, (this.h.get(r.n) ?? []).filter((x) => x !== r.f)); }
   trigger(n: string, ...a: unknown[]) { (this.h.get(n) ?? []).forEach((f) => f(...a)); }
 }
 export class TFile { constructor(public path: string) {} get extension() { return this.path.split(".").pop(); } }
@@ -34,11 +39,11 @@ export const Platform = { get isPhone() { return (window as any).__phone === tru
 const ICONS: Record<string, string> = { "chevron-left": "‹", "chevron-right": "›", plus: "+", eye: "◉", "eye-off": "◎", flame: "🔥", "file-text": "▤", "calendar-days": "▦", repeat: "↻", "list-checks": "☑", check: "✓", "fold-vertical": "≡", "unfold-vertical": "☰" };
 export function setIcon(el: HTMLElement, name: string) { el.textContent = ICONS[name] ?? "•"; }
 
-export class Notice { constructor(msg: string) { const n = document.createElement("div"); n.className = "notice"; n.textContent = msg; document.body.appendChild(n); setTimeout(() => n.remove(), 2500); } }
+export class Notice { constructor(msg: any) { const n = document.createElement("div"); n.className = "notice"; if (typeof msg === "string") n.textContent = msg; else n.appendChild(msg); document.body.appendChild(n); setTimeout(() => n.remove(), 2500); } }
 
 export class Menu {
   items: any[] = [];
-  addItem(fn: (i: any) => void) { const it: any = { title: "", cb: () => {} }; const api = { setTitle: (t: string) => { it.title = t; return api; }, setIcon: () => api, setChecked: (c: boolean) => { it.checked = c; return api; }, setWarning: () => api, onClick: (f: any) => { it.cb = f; return api; } }; fn(api); this.items.push(it); return this; }
+  addItem(fn: (i: any) => void) { const it: any = { title: "", cb: () => {} }; const api = { setTitle: (t: string) => { it.title = t; return api; }, setIcon: () => api, setChecked: (c: boolean) => { it.checked = c; return api; }, setWarning: () => api, setDisabled: () => api, onClick: (f: any) => { it.cb = f; return api; } }; fn(api); this.items.push(it); return this; }
   addSeparator() { this.items.push(null); return this; }
   showAtMouseEvent(e: MouseEvent) {
     document.querySelector(".menu")?.remove();
@@ -71,6 +76,24 @@ export class ItemView {
   registerEvent() {}
   registerDomEvent(el: HTMLElement, ev: string, fn: any) { el.addEventListener(ev, fn); }
 }
+export class MarkdownRenderChild { constructor(public containerEl: HTMLElement) {} registerEvent() {} }
+export class SuggestModal<T> extends Modal {
+  inputEl!: HTMLInputElement; resultsEl!: HTMLElement;
+  setPlaceholder(p: string) { this.inputEl.placeholder = p; }
+  setInstructions() {}
+  constructor(app: any) { super(app); this.inputEl = this.contentEl.createEl("input", { attr: { type: "text" } }) as HTMLInputElement; this.resultsEl = this.contentEl.createDiv({ cls: "suggestion-container" }); this.inputEl.oninput = () => this.refresh(); }
+  getSuggestions(_q: string): T[] { return []; }
+  renderSuggestion(_v: T, _el: HTMLElement) {}
+  onChooseSuggestion(_v: T) {}
+  refresh() { this.resultsEl.innerHTML = ""; for (const v of this.getSuggestions(this.inputEl.value)) { const el = this.resultsEl.createDiv({ cls: "suggestion-item" }); this.renderSuggestion(v, el); el.onclick = () => { this.close(); this.onChooseSuggestion(v); }; } }
+  open() { super.open(); this.refresh(); }
+}
+export class FuzzySuggestModal<T> extends SuggestModal<any> {
+  getItems(): T[] { return []; } getItemText(_t: T) { return ""; } onChooseItem(_t: T) {}
+  getSuggestions(q: string) { return this.getItems().filter((t) => this.getItemText(t).toLowerCase().includes(q.toLowerCase())).map((item) => ({ item, match: {} })); }
+  onChooseSuggestion(v: any) { this.onChooseItem(v.item); }
+}
+export type FuzzyMatch<T> = { item: T; match: any }; export type MarkdownPostProcessorContext = any;
 export class Plugin {} export class PluginSettingTab {} export class Setting {}
 export type App = any; export type WorkspaceLeaf = any;
 
@@ -87,5 +110,6 @@ export class MemVault extends Events {
   async cachedRead(f: TFile) { return this.read(f); }
   async create(p: string, d: string) { this.files.set(p, d); return new TFile(p); }
   async createFolder() {}
+  getMarkdownFiles() { return [...this.files.keys()].filter((k) => k.endsWith(".md")).map((k) => new TFile(k)); }
   async process(f: TFile, fn: (d: string) => string) { const out = fn(this.files.get(f.path) ?? ""); this.files.set(f.path, out); (window as any).__onWrite?.(f.path, out); return out; }
 }

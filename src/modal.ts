@@ -3,15 +3,19 @@ import { DAY_SHORT, DateStr, weekday } from "./dates";
 import { PRIORITY_LABEL, Priority, Task, emptyTask, formatDuration, parseDuration, recurrenceLabel, weekOnRule } from "./model";
 import { parseQuick } from "./quickadd";
 import { Store } from "./store";
+import type WeekPlannerPlugin from "./main";
+import { STALE_AT } from "./weekView";
 
 const PRIORITIES: Priority[] = [3, 2, 1, 0, -1];
 
 export class TaskModal extends Modal {
   private draft: Task;
   private isNew: boolean;
+  private store: Store;
 
-  constructor(app: App, private store: Store, task: Task | null, defaultDue: DateStr | null) {
+  constructor(app: App, private plugin: WeekPlannerPlugin, task: Task | null, defaultDue: DateStr | null) {
     super(app);
+    this.store = plugin.store;
     this.isNew = !task;
     this.draft = task ? structuredClone(task) : emptyTask({ due: defaultDue });
   }
@@ -26,6 +30,8 @@ export class TaskModal extends Modal {
     const t = this.draft;
     const c = this.contentEl;
     c.empty();
+
+    if (!this.isNew && !t.done && t.moved >= STALE_AT) this.renderStaleBanner(c);
 
     const title = c.createEl("input", { cls: "wp-modal-title", attr: { type: "text", placeholder: this.isNew ? "Что сделать? (можно: завтра 14:00 1ч #тег !!)" : "Название" } });
     title.value = t.title;
@@ -165,7 +171,8 @@ export class TaskModal extends Modal {
       }
     });
 
-    if (t.moved) c.createDiv({ cls: "wp-modal-note", text: `↪ Переносилась ${t.moved} раз(а)` });
+    if (t.moved && t.moved < STALE_AT) c.createDiv({ cls: "wp-modal-note", text: `↪ Переносилась ${t.moved} раз(а)` });
+    if (t.spent) c.createDiv({ cls: "wp-modal-note is-muted", text: `⏱ В фокусе: ${formatDuration(t.spent).replace("h", "ч ").replace("m", "м")}` });
 
     // buttons
     const footer = c.createDiv("wp-modal-footer");
@@ -177,9 +184,44 @@ export class TaskModal extends Modal {
         this.close();
       };
     }
+    if (!this.isNew && !t.done) {
+      const focus = footer.createEl("button", { text: "▶ Фокус" });
+      focus.onclick = () => {
+        this.close();
+        this.plugin.activateFocus(t.id);
+      };
+    }
     footer.createDiv({ cls: "wp-spacer" });
     footer.createEl("button", { text: "Отмена" }).onclick = () => this.close();
     footer.createEl("button", { text: "Сохранить", cls: "mod-cta" }).onclick = () => this.save();
+  }
+
+  private renderStaleBanner(c: HTMLElement) {
+    const t = this.draft;
+    const b = c.createDiv("wp-stale-banner");
+    b.createDiv({ cls: "wp-stale-text", text: `⚠️ Задача переносилась ${t.moved} раз. Похоже, она слишком большая или уже не нужна.` });
+    const actions = b.createDiv("wp-stale-actions");
+    const act = (label: string, fn: () => void | Promise<void>) => {
+      const btn = actions.createEl("button", { text: label, cls: "wp-chip-btn" });
+      btn.onclick = async () => { await fn(); };
+    };
+    act("Разбить на подзадачи", () => {
+      t.moved = 0;
+      (this.contentEl.querySelector(".wp-add-sub") as HTMLInputElement)?.focus();
+      b.remove();
+    });
+    act("В бэклог", async () => {
+      await this.store.update(t.id, { due: null, moved: 0 });
+      this.close();
+    });
+    act("Сбросить счётчик", () => {
+      t.moved = 0;
+      b.remove();
+    });
+    act("Удалить", async () => {
+      await this.store.remove(t.id);
+      this.close();
+    });
   }
 
   private async save() {

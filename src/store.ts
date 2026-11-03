@@ -1,6 +1,7 @@
 import { App, Events, TFile, TFolder, normalizePath } from "obsidian";
 import { DateStr, addDays, today, weekday } from "./dates";
-import { Doc, Task, docTasks, emptyTask, newId, nextOccurrence, parseDoc, serializeDoc, serializeTask } from "./model";
+import { ExternalIndex, isExternalId } from "./external";
+import { Doc, Task, docTasks, emptyTask, newId, nextOccurrence, parseDoc, parseTaskBody, serializeDoc, serializeTask } from "./model";
 
 export interface PlannerSettings {
   tasksFile: string;
@@ -11,6 +12,18 @@ export interface PlannerSettings {
   showDone: boolean;
   openOnStartup: boolean;
   dayCapacityHours: number;
+  templatesFile: string;
+  reviewsFolder: string;
+  dailyFolder: string;
+  scanVault: boolean;
+  notifications: boolean;
+  reminderMinutes: number;
+  pomodoroMinutes: number;
+  breakMinutes: number;
+  timelineStart: number;
+  timelineEnd: number;
+  planningPrompt: boolean;
+  lastPlannedWeek: string;
 }
 
 export const DEFAULT_SETTINGS: PlannerSettings = {
@@ -22,7 +35,24 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   showDone: true,
   openOnStartup: true,
   dayCapacityHours: 8,
+  templatesFile: "Planner/Templates.md",
+  reviewsFolder: "Planner/Reviews",
+  dailyFolder: "Daily",
+  scanVault: true,
+  notifications: true,
+  reminderMinutes: 10,
+  pomodoroMinutes: 25,
+  breakMinutes: 5,
+  timelineStart: 7,
+  timelineEnd: 23,
+  planningPrompt: true,
+  lastPlannedWeek: "",
 };
+
+export interface Template {
+  name: string;
+  tasks: { task: Partial<Task>; day: number | null }[];
+}
 
 export interface Habit {
   id: string;
@@ -42,27 +72,73 @@ const TASKS_HEADER = `# Задачи
 
 const HABITS_HEADER = "# Привычки\n";
 
+const TEMPLATES_HEADER = `# Шаблоны
+
+Каждый раздел «## Название» — шаблон. Строки — задачи в обычном формате.
+[day:: 1] … [day:: 7] привязывает задачу к дню недели (1 — понедельник) при применении шаблона к неделе.
+
+## Рабочий понедельник
+- [ ] Планёрка #работа [time:: 10:00] [dur:: 30m] [day:: 1]
+- [ ] Разобрать почту #работа [dur:: 30m] [day:: 1]
+- [ ] Спланировать неделю [dur:: 15m] [day:: 1]
+`;
+
 export class Store extends Events {
   doc: Doc = { lines: [] };
   habits: HabitsData = { habits: [], log: new Map() };
+  external: ExternalIndex;
   private lastWritten = new Map<string, string>();
 
   constructor(private app: App, public settings: PlannerSettings) {
     super();
+    this.external = new ExternalIndex(app, (p) => this.isPlannerPath(p));
   }
 
+  isPlannerPath(path: string) {
+    const s = this.settings;
+    return path === normalizePath(s.tasksFile) || path === normalizePath(s.habitsFile) || path === normalizePath(s.templatesFile)
+      || path.startsWith(normalizePath(s.archiveFolder) + "/") || path.startsWith(normalizePath(s.reviewsFolder) + "/");
+  }
+
+  /** Tasks from Tasks.md only. */
   tasks(): Task[] {
     return docTasks(this.doc);
   }
 
+  /** Tasks.md plus dated tasks found in other notes. */
+  all(): Task[] {
+    return this.settings.scanVault ? [...this.tasks(), ...this.external.all()] : this.tasks();
+  }
+
   find(id: string): Task | undefined {
-    return this.tasks().find((t) => t.id === id);
+    return isExternalId(id) ? this.external.find(id) : this.tasks().find((t) => t.id === id);
+  }
+
+  /** Where a task shows up: unfinished overdue tasks from notes appear on today (we don't rewrite other notes automatically). */
+  effectiveDue(t: Task): DateStr | null {
+    if (t.source && !t.done && t.due && t.due < today()) return today();
+    return t.due;
   }
 
   allTags(): string[] {
     const set = new Set<string>();
-    for (const t of this.tasks()) t.tags.forEach((x) => set.add(x));
+    for (const t of this.all()) t.tags.forEach((x) => set.add(x));
     return [...set].sort();
+  }
+
+  async scanExternal() {
+    if (!this.settings.scanVault) return;
+    await this.external.scanAll();
+    this.trigger("changed");
+  }
+
+  onNoteChanged(path: string, text: string) {
+    if (!this.settings.scanVault || this.isPlannerPath(path)) return;
+    if (this.external.scanText(path, text)) this.trigger("changed");
+  }
+
+  onNoteDeleted(path: string) {
+    if (this.external.remove(path)) this.trigger("changed");
   }
 
   // ---------- files ----------
@@ -154,6 +230,11 @@ export class Store extends Events {
   }
 
   async update(id: string, patch: Partial<Task>) {
+    if (isExternalId(id)) {
+      const t = this.external.find(id);
+      if (t && "due" in patch) await this.external.setDue(t, patch.due ?? null);
+      return;
+    }
     await this.mutate((doc) => {
       const t = docTasks(doc).find((x) => x.id === id);
       if (t) Object.assign(t, patch);
@@ -161,12 +242,18 @@ export class Store extends Events {
   }
 
   async remove(id: string) {
+    if (isExternalId(id)) return;
     await this.mutate((doc) => {
       doc.lines = doc.lines.filter((l) => !(l.kind === "task" && l.task.id === id));
     });
   }
 
   async toggle(id: string) {
+    if (isExternalId(id)) {
+      const t = this.external.find(id);
+      if (t) await this.external.toggle(t);
+      return;
+    }
     await this.mutate((doc) => {
       const idx = doc.lines.findIndex((l) => l.kind === "task" && l.task.id === id);
       if (idx < 0) return;
@@ -194,7 +281,13 @@ export class Store extends Events {
   }
 
   /** Move a task to `due` (null = backlog), placing it before `beforeId` or at the end of that day. */
-  async move(id: string, due: DateStr | null, beforeId: string | null) {
+  async move(id: string, due: DateStr | null, beforeId: string | null, patch: Partial<Task> = {}) {
+    if (isExternalId(id)) {
+      const t = this.external.find(id);
+      if (t && t.due !== due) await this.external.setDue(t, due);
+      return;
+    }
+    if (beforeId && isExternalId(beforeId)) beforeId = null;
     await this.mutate((doc) => {
       const idx = doc.lines.findIndex((l) => l.kind === "task" && l.task.id === id);
       if (idx < 0) return;
@@ -205,10 +298,77 @@ export class Store extends Events {
         if (!t.done && t.due && due && due > t.due && t.due <= today()) t.moved += 1;
         t.due = due;
       }
+      Object.assign(t, patch);
       let at = beforeId ? doc.lines.findIndex((l) => l.kind === "task" && l.task.id === beforeId) : -1;
       if (at < 0) at = insertIndexForDay(doc, due);
       doc.lines.splice(at, 0, line);
     });
+  }
+
+  async addMany(items: { task: Partial<Task>; due: DateStr | null }[]) {
+    await this.mutate((doc) => {
+      for (const it of items) {
+        const task = emptyTask({ ...it.task, id: newId(), due: it.due, created: today() });
+        doc.lines.splice(insertIndexForDay(doc, it.due), 0, { kind: "task", task });
+      }
+    });
+  }
+
+  async addSpent(id: string, minutes: number) {
+    if (isExternalId(id) || minutes <= 0) return;
+    await this.mutate((doc) => {
+      const t = docTasks(doc).find((x) => x.id === id);
+      if (t) t.spent += minutes;
+    });
+  }
+
+  // ---------- templates ----------
+  // Templates.md: "## Name" followed by task lines; [day:: 1-7] pins a task to a weekday.
+
+  async loadTemplates(): Promise<Template[]> {
+    const file = await this.ensureFile(this.settings.templatesFile, TEMPLATES_HEADER);
+    const out: Template[] = [];
+    let cur: Template | null = null;
+    for (const line of (await this.app.vault.read(file)).split(/\r?\n/)) {
+      const h = line.match(/^##\s+(.+)$/);
+      if (h) {
+        cur = { name: h[1].trim(), tasks: [] };
+        out.push(cur);
+        continue;
+      }
+      const m = line.match(/^- \[[ xX]\] (.*)$/);
+      if (!m || !cur) continue;
+      let body = m[1];
+      let day: number | null = null;
+      const dm = body.match(/\[day::\s*(\d)\s*\]/);
+      if (dm) {
+        day = parseInt(dm[1]);
+        body = body.replace(dm[0], " ");
+      }
+      const t = parseTaskBody(" ", body);
+      const { id, due, created, doneDate, done, ...rest } = t;
+      void id; void due; void created; void doneDate; void done;
+      cur.tasks.push({ task: rest, day });
+    }
+    return out;
+  }
+
+  async applyTemplate(tpl: Template, weekStart: DateStr, day: DateStr | null) {
+    await this.addMany(tpl.tasks.map((x) => ({
+      task: x.task,
+      due: day ?? (x.day ? addDays(weekStart, x.day - 1) : weekStart),
+    })));
+  }
+
+  async saveTemplate(name: string, tasks: Task[], withDays: boolean) {
+    const file = await this.ensureFile(this.settings.templatesFile, TEMPLATES_HEADER);
+    const lines = tasks.filter((t) => !t.source).map((t) => {
+      const clean: Task = { ...t, id: "", done: false, due: null, doneDate: null, created: null, moved: 0, spent: 0 };
+      let line = serializeTask(clean)[0];
+      if (withDays && t.due) line += ` [day:: ${weekday(t.due)}]`;
+      return line;
+    });
+    await this.app.vault.process(file, (data) => data.replace(/\n*$/, "\n") + `\n## ${name}\n` + lines.join("\n") + "\n");
   }
 
   async toggleSubtask(id: string, i: number) {

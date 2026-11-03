@@ -1,6 +1,6 @@
 import { ItemView, Menu, Modal, App, WorkspaceLeaf, setIcon } from "obsidian";
 import { DAY_SHORT, DateStr, addDays, dayNum, fmtMinutes, humanDay, startOfWeek, today, weekDays, weekLabel, weekday } from "./dates";
-import { Task, newId } from "./model";
+import { Task, newId, projectOf } from "./model";
 import { Habit, Store } from "./store";
 import { tagColor } from "./weekView";
 import type WeekPlannerPlugin from "./main";
@@ -123,9 +123,12 @@ export class HabitsView extends ItemView {
 
   private renderStats(page: HTMLElement) {
     const sec = page.createDiv("wp-section");
-    sec.createDiv("wp-section-head").createEl("h3", { text: "Статистика недели" });
+    const sh = sec.createDiv("wp-section-head");
+    sh.createEl("h3", { text: "Статистика недели" });
+    const rv = sh.createEl("button", { cls: "wp-chip-btn", text: "📊 Итоги недели" });
+    rv.onclick = () => this.plugin.createReview(this.weekStart);
     const days = weekDays(this.weekStart);
-    const all = [...this.store.tasks(), ...this.archive];
+    const all = [...this.store.all(), ...this.archive];
     const inWeek = all.filter((t) => t.due && t.due >= days[0] && t.due <= days[6]);
     const done = inWeek.filter((t) => t.done);
     const minutesDone = done.reduce((s, t) => s + t.duration, 0);
@@ -142,6 +145,11 @@ export class HabitsView extends ItemView {
     };
     tile("Выполнено", inWeek.length ? `${Math.round((done.length / inWeek.length) * 100)}%` : "—", `${done.length} из ${inWeek.length} задач`);
     tile("Время в работе", fmtMinutes(minutesDone) || "0", minutesPlanned ? `из ${fmtMinutes(minutesPlanned)} запланированных` : "длительность не указана");
+    const tracked = inWeek.filter((t) => t.spent > 0);
+    const spent = tracked.reduce((s, t) => s + t.spent, 0);
+    const est = tracked.reduce((s, t) => s + t.duration, 0);
+    tile("План / факт (фокус)", spent ? `${fmtMinutes(est) || "—"} / ${fmtMinutes(spent)}` : "—",
+      spent && est ? (spent > est ? `недооценка на ${Math.round((spent / est - 1) * 100)}%` : `уложился, запас ${Math.round((1 - spent / est) * 100)}%`) : "запускай помодоро, чтобы считать факт");
     tile("Переносились", String(moved), moved ? "задач сдвигались хотя бы раз" : "ничего не откладывали 👍");
     const bestHabit = this.store.habits.habits.map((h) => ({ h, s: this.store.streak(h).current })).sort((a, b) => b.s - a.s)[0];
     tile("Лучшая серия", bestHabit?.s ? `🔥 ${bestHabit.s}` : "—", bestHabit?.s ? bestHabit.h.name : "привычек пока нет");
@@ -183,6 +191,32 @@ export class HabitsView extends ItemView {
         inner.style.width = `${(v.total / tmax) * 100}%`;
         const fill = inner.createDiv(`wp-hbar-fill ${tag === "без тега" ? "" : `tag-c${tagColor(tag)}`}`);
         fill.style.width = `${(v.done / v.total) * 100}%`;
+        row.createDiv({ cls: "wp-hbar-value", text: `${v.done}/${v.total}` });
+      }
+    }
+
+    // projects (all time)
+    const projMap = new Map<string, { total: number; done: number; spent: number }>();
+    for (const t of all) {
+      const p = projectOf(t);
+      if (!p) continue;
+      const e = projMap.get(p) ?? { total: 0, done: 0, spent: 0 };
+      e.total++;
+      if (t.done) e.done++;
+      e.spent += t.spent;
+      projMap.set(p, e);
+    }
+    if (projMap.size) {
+      const pc = sec.createDiv("wp-chart");
+      pc.createDiv({ cls: "wp-chart-title", text: "Проекты" });
+      for (const [p, v] of [...projMap.entries()].sort((a, b) => (b[1].total - b[1].done) - (a[1].total - a[1].done))) {
+        const row = pc.createDiv({ cls: "wp-hbar-row", attr: { "aria-label": `${p}: ${v.done} из ${v.total}${v.spent ? `, в фокусе ${fmtMinutes(v.spent)}` : ""}` } });
+        const label = row.createDiv({ cls: "wp-hbar-label wp-link", text: p });
+        label.onclick = () => this.app.workspace.openLinkText(p, "", "tab");
+        const track = row.createDiv("wp-hbar-track");
+        const inner = track.createDiv("wp-hbar-total");
+        inner.style.width = "100%";
+        inner.createDiv("wp-hbar-fill wp-hbar-accent").style.width = `${(v.done / v.total) * 100}%`;
         row.createDiv({ cls: "wp-hbar-value", text: `${v.done}/${v.total}` });
       }
     }

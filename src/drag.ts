@@ -5,9 +5,16 @@
 // Drop targets: elements with [data-drop]. A target with [data-drop-list] gets a placeholder
 // between its .wp-card children; others (day pills on mobile) just highlight.
 
+export interface DropInfo {
+  el: HTMLElement; // the [data-drop] element
+  top: number; // client Y of the dragged card's top edge
+}
+
 export interface DragCallbacks {
-  onDrop(id: string, target: string, beforeId: string | null): void;
+  onDrop(id: string, target: string, beforeId: string | null, info: DropInfo): void;
   onSwipe?(id: string, dir: "left" | "right"): void;
+  /** Called while hovering a drop target, e.g. to show a time indicator on the timeline. */
+  onHover?(el: HTMLElement | null, top: number): void;
 }
 
 const LONG_PRESS = 280;
@@ -169,6 +176,7 @@ export class DragController {
       this.target = target;
       target?.addClass("is-drop-target");
     }
+    this.cb.onHover?.(target, y - this.offsetY);
     if (!target || !target.hasAttribute("data-drop-list")) {
       this.placeholder.remove();
       this.beforeId = null;
@@ -216,11 +224,13 @@ export class DragController {
     if (mode === "drag") {
       this.suppressClick = true;
       setTimeout(() => (this.suppressClick = false), 50);
-      const target = this.target?.dataset.drop;
+      const el = this.target;
+      const target = el?.dataset.drop;
       const id = this.id;
       const before = this.beforeId;
+      const top = this.lastY - this.offsetY;
       this.cleanup();
-      if (target) this.cb.onDrop(id, target, before);
+      if (el && target) this.cb.onDrop(id, target, before, { el, top });
       return;
     }
     if (mode === "swipe") {
@@ -250,6 +260,7 @@ export class DragController {
       this.card.style.transform = "";
     }
     document.body.removeClass("wp-is-dragging");
+    if (this.mode === "drag") this.cb.onHover?.(null, 0);
     this.card = null;
     this.mode = "idle";
   }
