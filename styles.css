@@ -714,3 +714,12 @@ button.wp-danger { color: var(--color-red); }
 .wp-goal-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
 .wp-goal-row input[type="text"] { flex: 1; height: 32px; }
 .wp-goals-modal input.wp-goal-new { width: 100%; height: 32px; margin-top: 6px; }
+
+/* ======================= v2.6: toolbar zones ======================= */
+.wp-toolbar.wp-toolbar-3 { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; flex-wrap: nowrap; }
+.wp-toolbar-3 .wp-toolbar-left { display: flex; align-items: center; gap: 2px; min-width: 0; flex-wrap: wrap; }
+.wp-toolbar-3 .wp-toolbar-left .wp-add-btn { margin: 0 6px 0 0; }
+.wp-toolbar-3 .wp-nav { justify-self: end; }
+.wp-toolbar-3 .wp-week-title { margin-left: 10px; min-width: 150px; text-align: right; }
+/* phone: navigation on the left, the date pushed to the right edge */
+.wp-root.is-mobile .wp-m-row .wp-week-title { margin-left: auto; text-align: right; }
