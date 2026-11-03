@@ -1,6 +1,6 @@
 import { ItemView, Menu, Notice, Platform, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import {
-  DAY_LONG, DAY_SHORT, DateStr, MONTH_NOM, addDays, addMonths, dayNum, diffDays, fmtMinutes, humanDay, isoWeek, parse, relativeLabel,
+  DAY_LONG, DAY_SHORT, DateStr, MONTH_NOM, addDays, addMonths, dayNum, diffDays, fmtMinutes, humanDay, parse, relativeLabel,
   startOfWeek, today, weekDays, weekLabel, weekday,
 } from "./dates";
 import { DragController, DropInfo } from "./drag";
@@ -8,6 +8,7 @@ import { PRIORITY_LABEL, Priority, Task, compareInDay, displayTitle, projectOf, 
 import { CalEvent } from "./ics";
 import { SavedFilter } from "./store";
 import { TaskModal } from "./modal";
+import { GoalsModal } from "./goalsModal";
 import { parseQuick } from "./quickadd";
 import type WeekPlannerPlugin from "./main";
 import { ICON, icon, iconText } from "./ui";
@@ -156,7 +157,7 @@ export class WeekView extends ItemView {
     }
     if (e.metaKey || e.ctrlKey || e.altKey && !e.key.startsWith("Arrow")) return;
     const k = e.key;
-    if (k === "n" || k === "т") { e.preventDefault(); this.focusQuickAdd(); }
+    if (k === "n" || k === "т") { e.preventDefault(); this.newTask(); }
     else if (k === "t" || k === "е") this.goToday();
     else if (k === "[" || k === "х" || (k === "ArrowLeft" && e.altKey)) this.shift(-1);
     else if (k === "]" || k === "ъ" || (k === "ArrowRight" && e.altKey)) this.shift(1);
@@ -324,7 +325,6 @@ export class WeekView extends ItemView {
     root.toggleClass("is-compact", this.compact);
     root.dataset.mode = mode;
     this.renderToolbar(root, mode);
-    if (mode !== "month") this.renderGoals(root);
     if (mode === "month") this.renderMonth(root);
     else if (this.mobile) this.renderMobile(root);
     else if (mode === "timeline") this.renderTimeline(root);
@@ -369,7 +369,6 @@ export class WeekView extends ItemView {
       title.setText(`${MONTH_NOM[a.getMonth()]} ${a.getFullYear()}`);
     } else {
       title.createSpan({ text: weekLabel(this.weekStart) });
-      title.createSpan({ cls: "wp-week-num", text: `W${isoWeek(this.weekStart)}` });
     }
     const row2 = bar.createDiv("wp-m-row");
     const seg = row2.createDiv("wp-segmented wp-mode");
@@ -380,6 +379,11 @@ export class WeekView extends ItemView {
     }
     this.filterButton(row2, true);
     const icons = row2.createDiv("wp-toolbar-right");
+    if (mode !== "month") {
+      const g = icons.createEl("button", { cls: `wp-icon-btn clickable-icon ${this.filter.goal ? "is-running" : ""}`, attr: { "aria-label": "Цели недели" } });
+      setIcon(g, "target");
+      g.onclick = (e) => this.goalsMenu(e);
+    }
     this.iconBtn(icons, "search", "Найти задачу", () => this.plugin.openPalette());
     this.iconBtn(icons, "wand-2", "Спланировать неделю", () => this.plugin.openPlanning(this.weekStart));
     this.iconBtn(icons, "timer", "Фокус", () => this.plugin.activateFocus(), this.plugin.focus.running ? "is-running" : "");
@@ -401,6 +405,8 @@ export class WeekView extends ItemView {
     if (this.store.canUndo()) m.addItem((i) => i.setTitle("Отменить последнее действие").setIcon("undo-2").onClick(() => this.undo()));
     m.addItem((i) => i.setTitle(this.settings.showDone ? "Скрыть выполненные" : "Показать выполненные").setIcon(this.settings.showDone ? "eye-off" : "eye").onClick(() => this.toggleDone()));
     m.addItem((i) => i.setTitle("Шаблоны…").setIcon("layout-template").onClick(() => this.templatesMenu(e)));
+    if (!this.mobile && this.mode === "week")
+      m.addItem((i) => i.setTitle(this.compact ? "Обычный вид карточек" : "Компактный вид карточек").setIcon(this.compact ? "unfold-vertical" : "fold-vertical").onClick(() => { this.compact = !this.compact; this.render(); }));
     m.addItem((i) => i.setTitle("Открыть файл задач").setIcon("file-text").onClick(() => this.openTasksFile()));
     m.showAtMouseEvent(e);
   }
@@ -419,7 +425,6 @@ export class WeekView extends ItemView {
       title.createSpan({ text: `${MONTH_NOM[a.getMonth()]} ${a.getFullYear()}` });
     } else {
       title.createSpan({ text: weekLabel(this.weekStart) });
-      title.createSpan({ cls: "wp-week-num", text: `W${isoWeek(this.weekStart)}` });
     }
 
     const seg = bar.createDiv("wp-segmented wp-mode");
@@ -431,28 +436,54 @@ export class WeekView extends ItemView {
       b.onclick = () => this.setMode(m);
     }
 
-    if (mode !== "month") {
-      const days = weekDays(this.weekStart);
-      const weekTasks = this.store.all().filter((t) => t.due && t.due >= days[0] && t.due <= days[6]);
-      const done = weekTasks.filter((t) => t.done).length;
-      const prog = bar.createDiv({ cls: "wp-week-progress", attr: { "aria-label": `Выполнено ${done} из ${weekTasks.length}` } });
-      const pct = weekTasks.length ? Math.round((done / weekTasks.length) * 100) : 0;
-      prog.createDiv("wp-bar").createDiv({ cls: "wp-bar-fill", attr: { style: `width:${pct}%` } });
-      prog.createSpan({ cls: "wp-muted", text: `${done}/${weekTasks.length} · ${pct}%` });
-    }
-
-    if (!this.mobile) this.renderQuickAdd(bar, today(), "toolbar");
-
     const right = bar.createDiv("wp-toolbar-right");
+    if (mode !== "month") this.goalsButton(right, false);
     this.filterButton(right, false);
     this.iconBtn(right, "search", "Найти задачу (⌘K)", () => this.plugin.openPalette());
     this.iconBtn(right, "wand-2", "Спланировать неделю (p)", () => this.plugin.openPlanning(this.weekStart));
-    this.iconBtn(right, "layout-template", "Шаблоны", (e) => this.templatesMenu(e));
     this.iconBtn(right, "timer", "Фокус: сегодня и помодоро (f)", () => this.plugin.activateFocus(), this.plugin.focus.running ? "is-running" : "");
-    this.iconBtn(right, this.settings.showDone ? "eye" : "eye-off", this.settings.showDone ? "Скрыть выполненные (d)" : "Показать выполненные (d)", () => this.toggleDone());
-    if (!this.mobile && mode === "week") this.iconBtn(right, this.compact ? "unfold-vertical" : "fold-vertical", "Компактный вид", () => { this.compact = !this.compact; this.render(); });
     this.iconBtn(right, "flame", "Привычки и статистика", () => this.plugin.activateHabits());
-    this.iconBtn(right, "file-text", "Открыть файл задач", () => this.openTasksFile());
+    this.iconBtn(right, "more-horizontal", "Ещё", (e) => this.moreMenu(e));
+    const add = right.createEl("button", { cls: "mod-cta wp-add-btn", attr: { "aria-label": "Новая задача (n)" } });
+    icon(add, "plus");
+    add.createSpan({ text: "Задача" });
+    add.onclick = () => this.newTask();
+  }
+
+  private newTask() {
+    const day = this.selected !== BACKLOG && this.selected >= this.weekStart && this.selected <= addDays(this.weekStart, 6) ? this.selected : today();
+    new TaskModal(this.app, this.plugin, null, day).open();
+  }
+
+  // ---------- goals dropdown ----------
+
+  private goalsButton(parent: HTMLElement, compact: boolean) {
+    const goals = this.store.goalsFor(this.weekStart);
+    const active = this.filter.goal ? this.store.findGoal(this.filter.goal) : null;
+    const b = parent.createEl("button", { cls: `wp-chip-btn wp-goals-btn ${active ? "is-active" : ""}`, attr: { "aria-label": "Цели недели" } });
+    icon(b, "target");
+    if (!compact || active) b.createSpan({ text: active ? active.title : goals.length ? `Цели · ${goals.filter((g) => g.done).length}/${goals.length}` : "Цели" });
+    icon(b, "chevron-down", "wp-chevron");
+    b.onclick = (e) => this.goalsMenu(e);
+  }
+
+  private goalsMenu(e: MouseEvent) {
+    const goals = this.store.goalsFor(this.weekStart);
+    const tasks = this.store.tasks();
+    const m = new Menu();
+    if (!goals.length) m.addItem((i) => i.setTitle("Целей на эту неделю нет").setDisabled(true));
+    for (const g of goals) {
+      const linked = tasks.filter((t) => t.goal === g.id);
+      const count = linked.length ? `  ${linked.filter((t) => t.done).length}/${linked.length}` : "";
+      m.addItem((i) => i.setTitle(g.title + count).setIcon(g.done ? "check-circle-2" : "circle").setChecked(this.filter.goal === g.id)
+        .onClick(() => this.setFilter({ goal: this.filter.goal === g.id ? null : g.id })));
+    }
+    if (this.filter.goal) m.addItem((i) => i.setTitle("Показать все задачи").setIcon("x").onClick(() => this.setFilter({ goal: null })));
+    m.addSeparator();
+    if (goals.length < 5) m.addItem((i) => i.setTitle("Добавить цель…").setIcon("plus").onClick(() =>
+      this.plugin.promptText("Цель недели", "", (v) => this.store.addGoal(this.weekStart, v))));
+    if (goals.length) m.addItem((i) => i.setTitle("Управлять целями…").setIcon("settings-2").onClick(() => new GoalsModal(this.app, this.plugin, this.weekStart).open()));
+    m.showAtMouseEvent(e);
   }
 
   private async templatesMenu(e: MouseEvent) {
@@ -713,42 +744,6 @@ export class WeekView extends ItemView {
     }
   }
 
-  // ---------- goals ----------
-
-  private renderGoals(root: HTMLElement) {
-    const goals = this.store.goalsFor(this.weekStart);
-    const bar = root.createDiv("wp-goals");
-    const label = bar.createDiv("wp-goals-label");
-    icon(label, "target");
-    label.createSpan({ text: "Цели недели" });
-    const list = bar.createDiv("wp-goals-list");
-    const tasks = this.store.tasks();
-    for (const g of goals) {
-      const linked = tasks.filter((t) => t.goal === g.id);
-      const done = linked.filter((t) => t.done).length;
-      const chip = list.createDiv({ cls: `wp-goal ${g.done ? "is-done" : ""} ${this.filter.goal === g.id ? "is-active" : ""}` });
-      const cb = chip.createEl("input", { attr: { type: "checkbox", "aria-label": "Цель достигнута" }, cls: "task-list-item-checkbox" });
-      cb.checked = g.done;
-      cb.onclick = (e) => { e.stopPropagation(); this.store.updateGoal(g.id, { done: !g.done }); };
-      chip.createSpan({ cls: "wp-goal-title", text: g.title });
-      if (linked.length) chip.createSpan({ cls: "wp-goal-count", text: `${done}/${linked.length}` });
-      chip.onclick = () => this.setFilter({ goal: this.filter.goal === g.id ? null : g.id });
-      chip.oncontextmenu = (e) => {
-        e.preventDefault();
-        const m = new Menu();
-        m.addItem((i) => i.setTitle("Переименовать").setIcon("pencil").onClick(() => this.plugin.promptText("Цель", g.title, (v) => this.store.updateGoal(g.id, { title: v }))));
-        m.addItem((i) => i.setTitle("Удалить цель").setIcon("trash").onClick(() => this.store.removeGoal(g.id)));
-        m.showAtMouseEvent(e);
-      };
-    }
-    if (goals.length < 5) {
-      const add = list.createEl("button", { cls: "wp-chip-btn wp-goal-add", attr: { "aria-label": "Добавить цель недели" } });
-      icon(add, "plus");
-      if (!goals.length) add.createSpan({ text: "Добавить 1–3 главные цели недели" });
-      add.onclick = () => this.plugin.promptText("Цель недели", "", (v) => this.store.addGoal(this.weekStart, v));
-    }
-  }
-
   // ---------- calendar events ----------
 
   private renderEvents(parent: HTMLElement, day: DateStr) {
@@ -978,18 +973,7 @@ export class WeekView extends ItemView {
     };
     for (const d of weekDays(this.weekStart)) mk(d, DAY_SHORT[weekday(d) - 1], d);
     mk(BACKLOG, "Бэкл", null);
-    this.renderWeekProgress(root);
     this.renderDayList(root, this.selected === BACKLOG ? null : this.selected);
-  }
-
-  /** Thin week-progress line (mobile). */
-  private renderWeekProgress(root: HTMLElement) {
-    const days = weekDays(this.weekStart);
-    const weekTasks = this.store.all().filter((t) => t.due && t.due >= days[0] && t.due <= days[6]);
-    const done = weekTasks.filter((t) => t.done).length;
-    const pct = weekTasks.length ? Math.round((done / weekTasks.length) * 100) : 0;
-    const line = root.createDiv({ cls: "wp-m-progress", attr: { "aria-label": `Неделя: ${done} из ${weekTasks.length}` } });
-    line.createDiv({ cls: "wp-m-progress-fill", attr: { style: `width:${pct}%` } });
   }
 
   /** Mobile: the selected day's header, quick add and task list. */

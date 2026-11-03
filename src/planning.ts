@@ -1,5 +1,5 @@
 import { App, Modal, setIcon } from "obsidian";
-import { DAY_SHORT, DateStr, addDays, dayNum, fmtMinutes, isoWeek, today, weekDays, weekLabel, weekday } from "./dates";
+import { DAY_SHORT, DateStr, addDays, dayNum, fmtMinutes, today, weekDays, weekLabel, weekday } from "./dates";
 import { DragController } from "./drag";
 import { Task, displayTitle } from "./model";
 import type WeekPlannerPlugin from "./main";
@@ -18,7 +18,7 @@ export class PlanningModal extends Modal {
   onOpen() {
     this.modalEl.addClass("wp-modal", "wp-plan-modal");
     this.contentEl.addClass("wp-root");
-    this.titleEl.setText(`Планирование недели · W${isoWeek(this.weekStart)} · ${weekLabel(this.weekStart)}`);
+    this.titleEl.setText(`Планирование недели · ${weekLabel(this.weekStart)}`);
     const ref = this.plugin.store.on("changed", () => this.render());
     this.unsub = () => this.plugin.store.offref(ref);
     const days = weekDays(this.weekStart);

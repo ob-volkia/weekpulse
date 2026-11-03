@@ -16,7 +16,7 @@ ws.onmessage = (m) => {
 };
 const send = (method, params = {}) => new Promise((res) => { const id = ++seq; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })); });
 await new Promise((r) => (ws.onopen = r));
-const timer = setTimeout(() => { console.error("timeout"); process.exit(2); }, 20000);
+const timer = setTimeout(() => { console.error("timeout"); ws.close(); setTimeout(() => process.exit(2), 200); }, 20000);
 if (cmd === "eval") {
   const r = await send("Runtime.evaluate", { expression: arg, returnByValue: true, awaitPromise: true });
   if (r.error || r.result?.exceptionDetails) console.error(JSON.stringify(r.error ?? r.result.exceptionDetails, null, 1));
