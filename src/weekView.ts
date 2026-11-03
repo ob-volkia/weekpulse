@@ -413,29 +413,8 @@ export class WeekView extends ItemView {
 
   private renderToolbar(root: HTMLElement, mode: Mode) {
     if (this.mobile) return this.renderMobileToolbar(root, mode);
-    // Three zones: actions on the left, view switch in the centre, navigation on the right.
+    // Three zones: navigation on the left, view switch in the centre, actions on the right.
     const bar = root.createDiv("wp-toolbar wp-toolbar-3");
-
-    const left = bar.createDiv("wp-toolbar-left");
-    const add = left.createEl("button", { cls: "mod-cta wp-add-btn", attr: { "aria-label": "Новая задача (n)" } });
-    icon(add, "plus");
-    add.createSpan({ text: "Задача" });
-    add.onclick = () => this.newTask();
-    if (mode !== "month") this.goalsButton(left, false);
-    this.filterButton(left, false);
-    this.iconBtn(left, "search", "Найти задачу (⌘K)", () => this.plugin.openPalette());
-    this.iconBtn(left, "wand-2", "Спланировать неделю (p)", () => this.plugin.openPlanning(this.weekStart));
-    this.iconBtn(left, "timer", "Фокус: сегодня и помодоро (f)", () => this.plugin.activateFocus(), this.plugin.focus.running ? "is-running" : "");
-    this.iconBtn(left, "flame", "Привычки и статистика", () => this.plugin.activateHabits());
-    this.iconBtn(left, "more-horizontal", "Ещё", (e) => this.moreMenu(e));
-
-    const seg = bar.createDiv("wp-segmented wp-mode");
-    const modes: [Mode, string, string][] = [["week", "Неделя", "w"], ["month", "Месяц", "m"], ["timeline", "Шкала", "l"]];
-    for (const [m, label, key] of modes) {
-      const b = seg.createEl("button", { text: label, cls: "wp-seg-btn", attr: { "aria-label": `${label} (${key})` } });
-      if (mode === m) b.addClass("is-active");
-      b.onclick = () => this.setMode(m);
-    }
 
     const nav = bar.createDiv("wp-nav");
     const month = mode === "month";
@@ -447,6 +426,27 @@ export class WeekView extends ItemView {
       const a = parse(this.monthAnchor());
       title.setText(`${MONTH_NOM[a.getMonth()]} ${a.getFullYear()}`);
     } else title.setText(weekLabel(this.weekStart));
+
+    const seg = bar.createDiv("wp-segmented wp-mode");
+    const modes: [Mode, string, string][] = [["week", "Неделя", "w"], ["month", "Месяц", "m"], ["timeline", "Шкала", "l"]];
+    for (const [m, label, key] of modes) {
+      const b = seg.createEl("button", { text: label, cls: "wp-seg-btn", attr: { "aria-label": `${label} (${key})` } });
+      if (mode === m) b.addClass("is-active");
+      b.onclick = () => this.setMode(m);
+    }
+
+    const right = bar.createDiv("wp-toolbar-right");
+    if (mode !== "month") this.goalsButton(right, false);
+    this.filterButton(right, false);
+    this.iconBtn(right, "search", "Найти задачу (⌘K)", () => this.plugin.openPalette());
+    this.iconBtn(right, "wand-2", "Спланировать неделю (p)", () => this.plugin.openPlanning(this.weekStart));
+    this.iconBtn(right, "timer", "Фокус: сегодня и помодоро (f)", () => this.plugin.activateFocus(), this.plugin.focus.running ? "is-running" : "");
+    this.iconBtn(right, "flame", "Привычки и статистика", () => this.plugin.activateHabits());
+    this.iconBtn(right, "more-horizontal", "Ещё", (e) => this.moreMenu(e));
+    const add = right.createEl("button", { cls: "mod-cta wp-add-btn", attr: { "aria-label": "Новая задача (n)" } });
+    icon(add, "plus");
+    add.createSpan({ text: "Задача" });
+    add.onclick = () => this.newTask();
   }
 
   private newTask() {
