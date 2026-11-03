@@ -43,7 +43,7 @@ const plugin: any = { store, settings, saveSettings() {}, activateHabits: () => 
   promptText: (t: string, i: string, cb: any) => new PromptModal(app as any, t, i, cb).open(),
   openDaily: (d: string) => console.log("daily", d), openSource: (t: any) => console.log("source", t.source), openFile: (p: string) => console.log("open", p),
   createReview: async (w: string) => { (window as any).review = buildReview(store, [], w); console.log((window as any).review); },
-  notify: (a: string, b: string) => console.log("notify", a, b) };
+  notify: (a: string, b: string) => console.log("notify", a, b), openArchived: (t: any) => console.log("archived", t), refreshCalendars: () => {} };
 plugin.focus = new FocusTimer(plugin);
 
 const container = document.getElementById("app")!;
@@ -63,5 +63,10 @@ async function show(kind: string) {
   await store.init();
   await store.rollover();
   await store.scanExternal();
+  const d0 = W.replace(/-/g, "");
+  store.setFeeds([`BEGIN:VEVENT\nUID:1\nSUMMARY:Стендап\nDTSTART:${d0}T093000\nDTEND:${d0}T094500\nRRULE:FREQ=DAILY;COUNT=5\nEND:VEVENT\nBEGIN:VEVENT\nUID:2\nSUMMARY:Встреча с клиентом\nDTSTART:${addDays(W,2).replace(/-/g,"")}T140000\nDTEND:${addDays(W,2).replace(/-/g,"")}T153000\nEND:VEVENT`]);
+  const gid = await store.addGoal(W, "Сдать отчёт");
+  await store.addGoal(W, "Запустить лендинг");
+  await store.update("a3", { goal: gid, deadline: addDays(T, 1) });
   await show((location.hash.slice(1) || "week"));
 })();

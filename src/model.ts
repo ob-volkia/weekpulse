@@ -25,9 +25,12 @@ export interface Task {
   doneDate: DateStr | null;
   moved: number;
   spent: number; // minutes actually tracked with the focus timer
+  deadline: DateStr | null; // "must be done by", separate from the day it's planned for
+  goal: string | null; // id of a weekly goal
   subtasks: Subtask[];
   extra: string[]; // indented non-checkbox lines kept verbatim
   source?: ExternalSource; // set for tasks that live in other notes
+  archivePath?: string; // set for tasks read from the archive (read-only)
 }
 
 export interface ExternalSource {
@@ -58,7 +61,7 @@ export function newId(): string {
 export function emptyTask(partial: Partial<Task> = {}): Task {
   return {
     id: newId(), title: "", done: false, tags: [], priority: 0, due: null, time: null, duration: 0,
-    recurrence: null, created: null, doneDate: null, moved: 0, spent: 0, subtasks: [], extra: [], ...partial,
+    recurrence: null, created: null, doneDate: null, moved: 0, spent: 0, deadline: null, goal: null, subtasks: [], extra: [], ...partial,
   };
 }
 
@@ -98,6 +101,8 @@ export function parseTaskBody(status: string, body: string): Task {
   if ((m = take(/\[dur::\s*([^\]]+)\]/))) t.duration = parseDuration(m[1]);
   if ((m = take(/\[moved::\s*(\d+)\s*\]/))) t.moved = parseInt(m[1]);
   if ((m = take(/\[spent::\s*([^\]]+)\]/))) t.spent = parseDuration(m[1]);
+  if ((m = take(/\[deadline::\s*(\d{4}-\d{2}-\d{2})\s*\]/))) t.deadline = m[1];
+  if ((m = take(/\[goal::\s*([\w-]+)\s*\]/))) t.goal = m[1];
   body = body.replace(/\s\^[\w-]+\s*$/, " "); // block id
   t.tags = [...body.matchAll(/(?:^|\s)#([\p{L}\p{N}_\/-]+)/gu)].map((x) => x[1]);
   body = body.replace(/(?:^|\s)#[\p{L}\p{N}_\/-]+/gu, " ");
@@ -112,6 +117,8 @@ export function serializeTask(t: Task): string[] {
   if (t.duration) parts.push(`[dur:: ${formatDuration(t.duration)}]`);
   if (t.moved) parts.push(`[moved:: ${t.moved}]`);
   if (t.spent) parts.push(`[spent:: ${formatDuration(t.spent)}]`);
+  if (t.deadline) parts.push(`[deadline:: ${t.deadline}]`);
+  if (t.goal) parts.push(`[goal:: ${t.goal}]`);
   if (t.priority) parts.push(PRIORITY_EMOJI[t.priority]);
   if (t.recurrence) parts.push(`🔁 ${t.recurrence}`);
   if (t.created) parts.push(`➕ ${t.created}`);
@@ -224,4 +231,14 @@ export function displayTitle(t: Task): string {
 
 export function isExternal(t: Task): boolean {
   return !!t.source;
+}
+
+// ---------- notes (indented lines under a task) ----------
+
+export function taskNotes(t: Task): string {
+  return t.extra.map((l) => l.replace(/^(\t| {1,4})/, "")).join("\n").trim();
+}
+
+export function setTaskNotes(t: Task, text: string) {
+  t.extra = text.trim() ? text.trim().split("\n").map((l) => "    " + l) : [];
 }

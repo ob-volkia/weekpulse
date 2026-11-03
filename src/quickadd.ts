@@ -98,6 +98,32 @@ export function parseQuick(input: string, base: DateStr = today()): QuickResult 
   for (const m of [...s.matchAll(/\s#([\p{L}\p{N}_\/-]+)/gu)]) task.tags!.push(m[1]);
   s = s.replace(/\s#[\p{L}\p{N}_\/-]+/gu, " ");
 
+  // deadline: "до пт", "до 15.12", "до завтра"
+  {
+    const m = s.match(/\s(?:до|к|by)\s+(сегодня|завтра|послезавтра|\d{1,2}\.\d{1,2}(?:\.\d{2,4})?|[а-яa-z]+)(?=\s)/i);
+    if (m) {
+    const w = m[1].toLowerCase();
+    let d: DateStr | null = null;
+    if (w === "сегодня") d = today();
+    else if (w === "завтра") d = addDays(today(), 1);
+    else if (w === "послезавтра") d = addDays(today(), 2);
+    else if (/^\d/.test(w)) {
+      const [dd, mm, yy] = w.split(".");
+      let y = yy ? parseInt(yy) : parseInt(today().slice(0, 4));
+      if (y < 100) y += 2000;
+      d = `${y}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+      if (!yy && d < today()) d = `${y + 1}${d.slice(4)}`;
+    } else {
+      const wd = dayOf(w);
+      if (wd) d = nextWeekday(addDays(today(), weekday(today()) === wd ? 7 : 0), wd);
+    }
+    if (d) {
+      task.deadline = d;
+      s = s.replace(m[0], " ");
+    }
+    }
+  }
+
   // dates
   if (due === undefined) {
     const l = lower();

@@ -1,10 +1,12 @@
 import { ItemView, Menu, Notice, Platform, TFile, WorkspaceLeaf, setIcon } from "obsidian";
 import {
-  DAY_LONG, DAY_SHORT, DateStr, MONTH_NOM, addDays, addMonths, dayNum, fmtMinutes, humanDay, isoWeek, parse, relativeLabel,
+  DAY_LONG, DAY_SHORT, DateStr, MONTH_NOM, addDays, addMonths, dayNum, diffDays, fmtMinutes, humanDay, isoWeek, parse, relativeLabel,
   startOfWeek, today, weekDays, weekLabel, weekday,
 } from "./dates";
 import { DragController, DropInfo } from "./drag";
-import { PRIORITY_LABEL, Priority, Task, compareInDay, displayTitle, projectOf, recurrenceLabel } from "./model";
+import { PRIORITY_LABEL, Priority, Task, compareInDay, displayTitle, projectOf, recurrenceLabel, taskNotes } from "./model";
+import { CalEvent } from "./ics";
+import { SavedFilter } from "./store";
 import { TaskModal } from "./modal";
 import { parseQuick } from "./quickadd";
 import type WeekPlannerPlugin from "./main";
@@ -33,7 +35,9 @@ export class WeekView extends ItemView {
   private weekStart: DateStr = startOfWeek(today());
   private selected: DateStr = today(); // mobile: which day is shown
   private mode: Mode = "week";
-  private tagFilter: string | null = null;
+  private filter: SavedFilter = { name: "", tag: null, minPriority: null, goal: null };
+  private selection = new Set<string>();
+  private selectMode = false;
   private drag: DragController | null = null;
   private compact = false;
   private mobile = false;
@@ -134,6 +138,17 @@ export class WeekView extends ItemView {
       if (e.key === "Escape") (e.target as HTMLElement).blur();
       return;
     }
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === "z" || e.key === "я")) {
+      e.preventDefault();
+      this.undo();
+      return;
+    }
+    if (e.key === "Escape" && (this.selection.size || this.selectMode)) {
+      this.selection.clear();
+      this.selectMode = false;
+      this.render();
+      return;
+    }
     if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "л")) {
       e.preventDefault();
       this.plugin.openPalette();
@@ -161,10 +176,86 @@ export class WeekView extends ItemView {
 
   // ---------- data ----------
 
+  private matches(t: Task) {
+    const f = this.filter;
+    if (f.tag && !t.tags.includes(f.tag)) return false;
+    if (f.minPriority != null && t.priority < f.minPriority) return false;
+    if (f.goal && t.goal !== f.goal) return false;
+    return true;
+  }
+
   private visible(t: Task) {
-    if (this.tagFilter && !t.tags.includes(this.tagFilter)) return false;
+    if (!this.matches(t)) return false;
     if (!this.settings.showDone && t.done) return false;
     return true;
+  }
+
+  private filterActive() {
+    const f = this.filter;
+    return !!(f.tag || f.minPriority != null || f.goal);
+  }
+
+  private filterLabel() {
+    const f = this.filter;
+    if (f.name) return f.name;
+    const parts: string[] = [];
+    if (f.tag) parts.push("#" + f.tag);
+    if (f.minPriority != null) parts.push(`${PRIORITY_LABEL[f.minPriority as Priority].toLowerCase()}+`);
+    if (f.goal) parts.push(this.store.findGoal(f.goal)?.title ?? "цель");
+    return parts.join(" · ");
+  }
+
+  private setFilter(patch: Partial<SavedFilter>) {
+    this.filter = { ...this.filter, name: "", ...patch };
+    this.render();
+  }
+
+  private filterMenu(e: MouseEvent) {
+    const m = new Menu();
+    const f = this.filter;
+    if (this.filterActive()) m.addItem((i) => i.setTitle("Сбросить фильтр").setIcon("x").onClick(() => this.setFilter({ tag: null, minPriority: null, goal: null })));
+    for (const sf of this.settings.savedFilters)
+      m.addItem((i) => i.setTitle(sf.name).setIcon("bookmark").setChecked(f.name === sf.name).onClick(() => { this.filter = { ...sf }; this.render(); }));
+    if (this.settings.savedFilters.length) m.addSeparator();
+    for (const t of this.store.allTags())
+      m.addItem((i) => i.setTitle("#" + t).setChecked(f.tag === t).onClick(() => this.setFilter({ tag: f.tag === t ? null : t })));
+    m.addSeparator();
+    for (const [p, label] of [[2, "Только высокий и срочный"], [1, "Средний и выше"]] as [number, string][])
+      m.addItem((i) => i.setTitle(label).setIcon("signal").setChecked(f.minPriority === p).onClick(() => this.setFilter({ minPriority: f.minPriority === p ? null : p })));
+    const goals = this.store.goalsFor(this.weekStart);
+    if (goals.length) {
+      m.addSeparator();
+      for (const g of goals) m.addItem((i) => i.setTitle(`Цель: ${g.title}`).setIcon("target").setChecked(f.goal === g.id).onClick(() => this.setFilter({ goal: f.goal === g.id ? null : g.id })));
+    }
+    if (this.filterActive() && !f.name) {
+      m.addSeparator();
+      m.addItem((i) => i.setTitle("Сохранить фильтр…").setIcon("bookmark-plus").onClick(() =>
+        this.plugin.promptText("Название фильтра", this.filterLabel(), async (name) => {
+          this.settings.savedFilters = [...this.settings.savedFilters.filter((x) => x.name !== name), { ...this.filter, name }];
+          await this.plugin.saveSettings();
+          this.filter = { ...this.filter, name };
+          this.render();
+        })));
+    }
+    if (f.name) m.addItem((i) => i.setTitle(`Удалить фильтр «${f.name}»`).setIcon("trash").onClick(async () => {
+      this.settings.savedFilters = this.settings.savedFilters.filter((x) => x.name !== f.name);
+      await this.plugin.saveSettings();
+      this.setFilter({ tag: null, minPriority: null, goal: null });
+    }));
+    m.showAtMouseEvent(e);
+  }
+
+  private filterButton(parent: HTMLElement, compact: boolean) {
+    const active = this.filterActive();
+    if (compact && !active) return;
+    const b = parent.createEl("button", { cls: `wp-chip-btn wp-filter-btn ${active ? "is-active" : ""}` });
+    icon(b, "filter");
+    b.createSpan({ text: active ? this.filterLabel() : "Фильтр" });
+    b.onclick = (e) => this.filterMenu(e);
+  }
+
+  private events(day: DateStr): CalEvent[] {
+    return this.store.eventsOn(day);
   }
 
   private tasksFor(day: DateStr | null): Task[] {
@@ -176,9 +267,10 @@ export class WeekView extends ItemView {
   }
 
   private dayStats(day: DateStr | null) {
-    const list = this.store.all().filter((t) => this.store.effectiveDue(t) === day && (!this.tagFilter || t.tags.includes(this.tagFilter)));
+    const list = this.store.all().filter((t) => this.store.effectiveDue(t) === day && this.matches(t));
     const done = list.filter((t) => t.done).length;
-    const minutes = list.filter((t) => !t.done).reduce((s, t) => s + t.duration, 0);
+    const events = day ? this.events(day).reduce((s, e) => s + e.minutes, 0) : 0;
+    const minutes = list.filter((t) => !t.done).reduce((s, t) => s + t.duration, 0) + events;
     return { total: list.length, done, minutes };
   }
 
@@ -232,10 +324,12 @@ export class WeekView extends ItemView {
     root.toggleClass("is-compact", this.compact);
     root.dataset.mode = mode;
     this.renderToolbar(root, mode);
+    if (mode !== "month") this.renderGoals(root);
     if (mode === "month") this.renderMonth(root);
     else if (this.mobile) this.renderMobile(root);
     else if (mode === "timeline") this.renderTimeline(root);
     else this.renderDesktop(root);
+    if (this.selectMode || this.selection.size) this.renderSelectionBar(root);
     this.restoreScroll(scroll);
     if (this.focusKey) {
       root.querySelector<HTMLInputElement>(`input[data-key="${this.focusKey}"]`)?.focus();
@@ -284,10 +378,7 @@ export class WeekView extends ItemView {
       if (mode === m) b.addClass("is-active");
       b.onclick = () => this.setMode(m);
     }
-    if (this.tagFilter) {
-      const chip = row2.createEl("button", { cls: `wp-chip-btn wp-filter-btn is-active tag-c${tagColor(this.tagFilter)}`, text: `#${this.tagFilter}` });
-      chip.onclick = () => { this.tagFilter = null; this.render(); };
-    }
+    this.filterButton(row2, true);
     const icons = row2.createDiv("wp-toolbar-right");
     this.iconBtn(icons, "search", "Найти задачу", () => this.plugin.openPalette());
     this.iconBtn(icons, "wand-2", "Спланировать неделю", () => this.plugin.openPlanning(this.weekStart));
@@ -300,10 +391,14 @@ export class WeekView extends ItemView {
     const m = new Menu();
     const tags = this.store.allTags();
     if (tags.length) {
-      m.addItem((i) => i.setTitle("Все теги").setIcon("tags").setChecked(!this.tagFilter).onClick(() => { this.tagFilter = null; this.render(); }));
-      for (const t of tags) m.addItem((i) => i.setTitle("#" + t).setChecked(this.tagFilter === t).onClick(() => { this.tagFilter = t; this.render(); }));
-      m.addSeparator();
+      m.addItem((i) => i.setTitle("Фильтр…").setIcon("filter").onClick(() => this.filterMenu(e)));
     }
+    m.addItem((i) => i.setTitle(this.selectMode ? "Закончить выбор" : "Выбрать задачи").setIcon("check-square").onClick(() => {
+      this.selectMode = !this.selectMode;
+      if (!this.selectMode) this.selection.clear();
+      this.render();
+    }));
+    if (this.store.canUndo()) m.addItem((i) => i.setTitle("Отменить последнее действие").setIcon("undo-2").onClick(() => this.undo()));
     m.addItem((i) => i.setTitle(this.settings.showDone ? "Скрыть выполненные" : "Показать выполненные").setIcon(this.settings.showDone ? "eye-off" : "eye").onClick(() => this.toggleDone()));
     m.addItem((i) => i.setTitle("Шаблоны…").setIcon("layout-template").onClick(() => this.templatesMenu(e)));
     m.addItem((i) => i.setTitle("Открыть файл задач").setIcon("file-text").onClick(() => this.openTasksFile()));
@@ -349,17 +444,7 @@ export class WeekView extends ItemView {
     if (!this.mobile) this.renderQuickAdd(bar, today(), "toolbar");
 
     const right = bar.createDiv("wp-toolbar-right");
-    const tags = this.store.allTags();
-    if (tags.length) {
-      const tb = right.createEl("button", { cls: "wp-chip-btn wp-filter-btn", text: this.tagFilter ? `#${this.tagFilter}` : "Все теги" });
-      if (this.tagFilter) tb.addClass("is-active", `tag-c${tagColor(this.tagFilter)}`);
-      tb.onclick = (e) => {
-        const m = new Menu();
-        m.addItem((i) => i.setTitle("Все теги").setChecked(!this.tagFilter).onClick(() => { this.tagFilter = null; this.render(); }));
-        for (const t of tags) m.addItem((i) => i.setTitle("#" + t).setChecked(this.tagFilter === t).onClick(() => { this.tagFilter = t; this.render(); }));
-        m.showAtMouseEvent(e);
-      };
-    }
+    this.filterButton(right, false);
     this.iconBtn(right, "search", "Найти задачу (⌘K)", () => this.plugin.openPalette());
     this.iconBtn(right, "wand-2", "Спланировать неделю (p)", () => this.plugin.openPlanning(this.weekStart));
     this.iconBtn(right, "layout-template", "Шаблоны", (e) => this.templatesMenu(e));
@@ -489,6 +574,7 @@ export class WeekView extends ItemView {
     this.colClasses(col, day);
     this.renderColHead(col, day);
     const list = col.createDiv({ cls: "wp-list wp-scroll-y", attr: { "data-drop": day ?? BACKLOG, "data-drop-list": "", "data-scroll-key": day ?? BACKLOG } });
+    if (day) this.renderEvents(list, day);
     for (const t of this.tasksFor(day)) this.renderCard(list, t);
     list.createDiv("wp-list-end");
     const foot = col.createDiv("wp-col-foot");
@@ -526,6 +612,15 @@ export class WeekView extends ItemView {
       for (let h = 0; h < hours; h++) col.createDiv("wp-tl-line").style.top = `${h * HOUR_PX}px`;
       if (d === today() && nowMin >= s.timelineStart * 60 && nowMin < s.timelineEnd * 60)
         col.createDiv("wp-tl-now").style.top = `${((nowMin - s.timelineStart * 60) / 60) * HOUR_PX}px`;
+      for (const ev of this.events(d)) {
+        if (!ev.start) continue;
+        const startMin = toMin(ev.start);
+        const block = col.createDiv({ cls: `wp-event wp-tl-event cal-${ev.calendar % 4}`, attr: { "aria-label": `${ev.start} ${ev.title}` } });
+        block.style.top = `${((startMin - s.timelineStart * 60) / 60) * HOUR_PX}px`;
+        block.style.height = `${(Math.max(ev.minutes, 20) / 60) * HOUR_PX - 2}px`;
+        block.createSpan({ cls: "wp-event-time", text: ev.start });
+        block.createSpan({ text: " " + ev.title });
+      }
       const timed = this.tasksFor(d).filter((t) => t.time);
       // Lay overlapping blocks side by side.
       const items = timed.map((t) => ({ t, start: toMin(t.time!), end: toMin(t.time!) + Math.max(t.duration || 30, 20), lane: 0, lanes: 1 }));
@@ -618,6 +713,92 @@ export class WeekView extends ItemView {
     }
   }
 
+  // ---------- goals ----------
+
+  private renderGoals(root: HTMLElement) {
+    const goals = this.store.goalsFor(this.weekStart);
+    const bar = root.createDiv("wp-goals");
+    const label = bar.createDiv("wp-goals-label");
+    icon(label, "target");
+    label.createSpan({ text: "Цели недели" });
+    const list = bar.createDiv("wp-goals-list");
+    const tasks = this.store.tasks();
+    for (const g of goals) {
+      const linked = tasks.filter((t) => t.goal === g.id);
+      const done = linked.filter((t) => t.done).length;
+      const chip = list.createDiv({ cls: `wp-goal ${g.done ? "is-done" : ""} ${this.filter.goal === g.id ? "is-active" : ""}` });
+      const cb = chip.createEl("input", { attr: { type: "checkbox", "aria-label": "Цель достигнута" }, cls: "task-list-item-checkbox" });
+      cb.checked = g.done;
+      cb.onclick = (e) => { e.stopPropagation(); this.store.updateGoal(g.id, { done: !g.done }); };
+      chip.createSpan({ cls: "wp-goal-title", text: g.title });
+      if (linked.length) chip.createSpan({ cls: "wp-goal-count", text: `${done}/${linked.length}` });
+      chip.onclick = () => this.setFilter({ goal: this.filter.goal === g.id ? null : g.id });
+      chip.oncontextmenu = (e) => {
+        e.preventDefault();
+        const m = new Menu();
+        m.addItem((i) => i.setTitle("Переименовать").setIcon("pencil").onClick(() => this.plugin.promptText("Цель", g.title, (v) => this.store.updateGoal(g.id, { title: v }))));
+        m.addItem((i) => i.setTitle("Удалить цель").setIcon("trash").onClick(() => this.store.removeGoal(g.id)));
+        m.showAtMouseEvent(e);
+      };
+    }
+    if (goals.length < 5) {
+      const add = list.createEl("button", { cls: "wp-chip-btn wp-goal-add", attr: { "aria-label": "Добавить цель недели" } });
+      icon(add, "plus");
+      if (!goals.length) add.createSpan({ text: "Добавить 1–3 главные цели недели" });
+      add.onclick = () => this.plugin.promptText("Цель недели", "", (v) => this.store.addGoal(this.weekStart, v));
+    }
+  }
+
+  // ---------- calendar events ----------
+
+  private renderEvents(parent: HTMLElement, day: DateStr) {
+    for (const ev of this.events(day)) {
+      const row = parent.createDiv({ cls: `wp-event cal-${ev.calendar % 4}`, attr: { "aria-label": "Событие календаря" } });
+      if (ev.start) row.createSpan({ cls: "wp-event-time", text: ev.start });
+      else icon(row, "calendar");
+      row.createSpan({ cls: "wp-event-title", text: ev.title });
+      if (ev.minutes) row.createSpan({ cls: "wp-muted", text: fmtMinutes(ev.minutes) });
+    }
+  }
+
+  // ---------- multi-select & undo ----------
+
+  private async undo() {
+    const label = await this.store.undo();
+    new Notice(label ? `Отменено: ${label.toLowerCase()}` : "Нечего отменять");
+  }
+
+  private renderSelectionBar(root: HTMLElement) {
+    const bar = root.createDiv("wp-selbar");
+    const ids = [...this.selection];
+    bar.createSpan({ cls: "wp-selbar-count", text: ids.length ? `Выбрано: ${ids.length}` : "Нажимай на задачи" });
+    const act = (ic: string, label: string, fn: () => unknown) => {
+      const b = bar.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": label } });
+      setIcon(b, ic);
+      b.disabled = !ids.length;
+      b.onclick = async () => {
+        await fn();
+        this.selection.clear();
+        this.selectMode = false;
+        this.render();
+      };
+    };
+    const now = today();
+    act("check", "Выполнено", () => this.store.bulk(ids, "done"));
+    act("sun", "На сегодня", () => this.store.bulk(ids, { due: now }));
+    act("sunrise", "На завтра", () => this.store.bulk(ids, { due: addDays(now, 1) }));
+    act("calendar-plus", "На следующую неделю", () => this.store.bulk(ids, { due: addDays(startOfWeek(now), 7) }));
+    act("inbox", "В бэклог", () => this.store.bulk(ids, { due: null }));
+    act("trash-2", "Удалить", () => this.store.bulk(ids, "remove"));
+    const close = bar.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": "Отмена" } });
+    setIcon(close, "x");
+    close.onclick = () => {
+      this.selection.clear();
+      this.selectMode = false;
+      this.render();
+    };
+  }
+
   // ---------- cards ----------
 
   private renderCard(parent: HTMLElement, t: Task, mini = false): HTMLElement {
@@ -628,6 +809,7 @@ export class WeekView extends ItemView {
     const stale = !t.done && t.moved >= STALE_AT;
     if (t.moved >= 3 && !t.done) card.addClass("is-stale");
     if (this.plugin.focus.taskId === t.id) card.addClass("is-focus");
+    if (this.selection.has(t.id)) card.addClass("is-selected");
     const overdue = !!t.source && !t.done && t.due! < today();
     const row = card.createDiv("wp-card-row");
     const cb = row.createEl("input", { attr: { type: "checkbox", "aria-label": "Выполнено" }, cls: "task-list-item-checkbox wp-check" });
@@ -650,6 +832,17 @@ export class WeekView extends ItemView {
       if (t.recurrence) setIcon(meta.createSpan({ cls: "wp-meta wp-icon-meta", attr: { "aria-label": recurrenceLabel(t.recurrence) } }), "repeat");
       if (t.moved) iconText(meta, ICON.moved, String(t.moved), "wp-meta wp-moved", `Переносилась ${t.moved} раз(а)`);
       if (overdue) meta.createSpan({ cls: "wp-meta wp-overdue", text: `с ${humanDay(t.due!)}` });
+      if (t.deadline && !t.done) {
+        const left = diffDays(t.deadline, today());
+        const cls = left < 0 ? "is-overdue" : left <= 2 ? "is-soon" : "";
+        iconText(meta, "flag", left === 0 ? "сегодня" : left === 1 ? "до завтра" : `до ${humanDay(t.deadline)}`, `wp-meta wp-deadline ${cls}`,
+          left < 0 ? `Дедлайн прошёл ${humanDay(t.deadline)}` : `Дедлайн: ${humanDay(t.deadline)}`);
+      }
+      if (taskNotes(t)) icon(meta.createSpan({ cls: "wp-meta", attr: { "aria-label": "Есть заметки" } }), "align-left");
+      if (t.goal) {
+        const g = this.store.findGoal(t.goal);
+        if (g) iconText(meta, "target", g.title, "wp-meta wp-goal-badge", "Цель недели");
+      }
       if (t.subtasks.length) {
         const done = t.subtasks.filter((s) => s.done).length;
         const s = meta.createSpan({ cls: "wp-meta wp-icon-meta" });
@@ -675,14 +868,22 @@ export class WeekView extends ItemView {
         const chip = meta.createSpan({ cls: `wp-tag tag-c${tagColor(tag)}`, text: "#" + tag });
         chip.addEventListener("click", (e) => {
           e.stopPropagation();
-          this.tagFilter = this.tagFilter === tag ? null : tag;
-          this.render();
+          this.setFilter({ tag: this.filter.tag === tag ? null : tag });
         });
       }
       if (!meta.childElementCount) meta.remove();
     }
 
-    card.addEventListener("click", () => this.openTask(t));
+    card.addEventListener("click", (e) => {
+      if (this.selectMode || this.selection.size || e.shiftKey || e.metaKey || e.ctrlKey) {
+        if (t.archivePath) return;
+        if (this.selection.has(t.id)) this.selection.delete(t.id);
+        else this.selection.add(t.id);
+        this.render();
+        return;
+      }
+      this.openTask(t);
+    });
     card.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       this.cardMenu(t).showAtMouseEvent(e);
@@ -802,6 +1003,7 @@ export class WeekView extends ItemView {
     if (day) this.iconBtn(right, "more-horizontal", "Действия с днём", (e) => this.dayMenu(e, day));
 
     const list = root.createDiv({ cls: "wp-list wp-m-list wp-scroll-y", attr: { "data-drop": day ?? BACKLOG, "data-drop-list": "", "data-scroll-key": `mobile-${this.mode}` } });
+    if (day) this.renderEvents(list, day);
     const tasks = this.tasksFor(day);
     for (const t of tasks) this.renderCard(list, t);
     if (!tasks.length) list.createDiv({ cls: "wp-empty", text: day === now ? "На сегодня всё чисто" : "Нет задач" });

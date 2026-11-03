@@ -6,8 +6,15 @@ import type WeekPlannerPlugin from "./main";
 
 /** ⌘K: fuzzy-find any task, then pick an action for it. */
 export class TaskPalette extends FuzzySuggestModal<Task> {
+  private archive: Task[] = [];
+
   constructor(app: App, private plugin: WeekPlannerPlugin) {
     super(app);
+    // Archived tasks load in the background and join the results once read.
+    plugin.store.loadArchive().then((list) => {
+      this.archive = list;
+      this.inputEl.dispatchEvent(new Event("input"));
+    });
     this.setPlaceholder("Найти задачу…");
     this.setInstructions([
       { command: "↑↓", purpose: "выбрать" },
@@ -19,7 +26,8 @@ export class TaskPalette extends FuzzySuggestModal<Task> {
 
   getItems(): Task[] {
     const now = today();
-    return this.plugin.store.all().slice().sort((a, b) => {
+    return [...this.plugin.store.all(), ...this.archive].sort((a, b) => {
+      if (!!a.archivePath !== !!b.archivePath) return a.archivePath ? 1 : -1;
       if (a.done !== b.done) return a.done ? 1 : -1;
       const da = a.due ?? "9999", db = b.due ?? "9999";
       // today and upcoming first, then overdue, then backlog
@@ -39,11 +47,16 @@ export class TaskPalette extends FuzzySuggestModal<Task> {
     el.createDiv({ cls: `wp-palette-prio prio-${t.priority}` });
     const body = el.createDiv("wp-palette-body");
     body.createDiv({ cls: "wp-palette-title", text: displayTitle(t) });
-    const meta = [t.due ? humanDay(t.due) : "бэклог", t.time ?? "", ...t.tags.map((x) => "#" + x), t.source ? `из ${t.source.path.replace(/\.md$/, "")}` : ""].filter(Boolean);
+    if (t.archivePath) el.addClass("is-archived");
+    const meta = [t.archivePath ? `архив · выполнено ${t.doneDate ? humanDay(t.doneDate) : ""}` : t.due ? humanDay(t.due) : "бэклог", t.time ?? "", ...t.tags.map((x) => "#" + x), t.source ? `из ${t.source.path.replace(/\.md$/, "")}` : ""].filter(Boolean);
     body.createDiv({ cls: "wp-muted", text: meta.join(" · ") });
   }
 
   onChooseItem(t: Task) {
+    if (t.archivePath) {
+      this.plugin.openArchived(t);
+      return;
+    }
     new ActionModal(this.app, this.plugin, t).open();
   }
 }

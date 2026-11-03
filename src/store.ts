@@ -1,6 +1,7 @@
 import { App, Events, TFile, TFolder, normalizePath } from "obsidian";
-import { DateStr, addDays, today, weekday } from "./dates";
+import { DateStr, addDays, humanDay, isoWeek, today, weekday } from "./dates";
 import { ExternalIndex, isExternalId } from "./external";
+import { CalEvent, expandEvents } from "./ics";
 import { Doc, Task, docTasks, emptyTask, newId, nextOccurrence, parseDoc, parseTaskBody, serializeDoc, serializeTask } from "./model";
 
 export interface PlannerSettings {
@@ -26,6 +27,24 @@ export interface PlannerSettings {
   lastPlannedWeek: string;
   mobileHintShown: boolean;
   navbarButton: boolean;
+  goalsFile: string;
+  backupsFolder: string;
+  backupDays: number;
+  calendars: string[]; // ICS links
+  savedFilters: SavedFilter[];
+}
+
+export interface SavedFilter {
+  name: string;
+  tag: string | null;
+  minPriority: number | null;
+  goal: string | null;
+}
+
+export interface Goal {
+  id: string;
+  title: string;
+  done: boolean;
 }
 
 export const DEFAULT_SETTINGS: PlannerSettings = {
@@ -51,6 +70,11 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   lastPlannedWeek: "",
   mobileHintShown: false,
   navbarButton: true,
+  goalsFile: "Planner/Goals.md",
+  backupsFolder: "Planner/Backups",
+  backupDays: 30,
+  calendars: [],
+  savedFilters: [],
 };
 
 export interface Template {
@@ -91,7 +115,11 @@ export class Store extends Events {
   doc: Doc = { lines: [] };
   habits: HabitsData = { habits: [], log: new Map() };
   external: ExternalIndex;
+  goals = new Map<string, Goal[]>(); // week key ("2026-W45") -> goals
+  feeds: string[] = []; // raw ICS texts, index = calendar
+  private eventCache = new Map<string, CalEvent[]>(); // month "2026-11" -> events
   private lastWritten = new Map<string, string>();
+  private undoStack: { label: string; path: string; text: string }[] = [];
 
   constructor(private app: App, public settings: PlannerSettings) {
     super();
@@ -101,7 +129,8 @@ export class Store extends Events {
   isPlannerPath(path: string) {
     const s = this.settings;
     return path === normalizePath(s.tasksFile) || path === normalizePath(s.habitsFile) || path === normalizePath(s.templatesFile)
-      || path.startsWith(normalizePath(s.archiveFolder) + "/") || path.startsWith(normalizePath(s.reviewsFolder) + "/");
+      || path === normalizePath(s.goalsFile)
+      || [s.archiveFolder, s.reviewsFolder, s.backupsFolder].some((f) => path.startsWith(normalizePath(f) + "/"));
   }
 
   /** Tasks from Tasks.md only. */
@@ -141,6 +170,23 @@ export class Store extends Events {
     if (this.external.scanText(path, text)) this.trigger("changed");
   }
 
+  setFeeds(feeds: string[]) {
+    this.feeds = feeds;
+    this.eventCache.clear();
+    this.trigger("changed");
+  }
+
+  eventsOn(day: DateStr): CalEvent[] {
+    if (!this.feeds.length) return [];
+    const month = day.slice(0, 7);
+    let list = this.eventCache.get(month);
+    if (!list) {
+      list = expandEvents(this.feeds, `${month}-01`, `${month}-31`);
+      this.eventCache.set(month, list);
+    }
+    return list.filter((e) => e.date === day);
+  }
+
   onNoteDeleted(path: string) {
     if (this.external.remove(path)) this.trigger("changed");
   }
@@ -159,6 +205,13 @@ export class Store extends Events {
   async init() {
     await this.loadTasks();
     await this.loadHabits();
+    await this.loadGoals();
+  }
+
+  async loadGoals() {
+    const file = await this.ensureFile(this.settings.goalsFile, GOALS_HEADER);
+    this.goals = parseGoals(await this.app.vault.read(file));
+    this.trigger("changed");
   }
 
   async loadTasks() {
@@ -179,9 +232,18 @@ export class Store extends Events {
   /** Called on vault "modify": reload when the change did not come from us (other device, manual edit). */
   async onFileModified(file: TFile) {
     const path = file.path;
-    if (path !== normalizePath(this.settings.tasksFile) && path !== normalizePath(this.settings.habitsFile)) return;
+    const s = this.settings;
+    if (![s.tasksFile, s.habitsFile, s.goalsFile].map(normalizePath).includes(path)) {
+      if (this.isConflictCopy(path)) this.trigger("conflict", path);
+      return;
+    }
     const text = await this.app.vault.read(file);
     if (this.lastWritten.get(path) === text) return;
+    if (path === normalizePath(s.goalsFile)) {
+      this.goals = parseGoals(text);
+      this.trigger("changed");
+      return;
+    }
     if (path === normalizePath(this.settings.tasksFile)) {
       this.doc = parseDoc(text);
       if (this.tasks().some((t) => !t.id)) await this.mutate(() => {});
@@ -193,10 +255,11 @@ export class Store extends Events {
   }
 
   /** Read-modify-write against the current file contents, so edits from other devices aren't clobbered. */
-  async mutate(fn: (doc: Doc) => void) {
+  async mutate(fn: (doc: Doc) => void, undoLabel?: string) {
     const file = await this.ensureFile(this.settings.tasksFile, TASKS_HEADER);
     let result: Doc = this.doc;
     await this.app.vault.process(file, (data) => {
+      if (undoLabel) this.pushUndo(undoLabel, file.path, data);
       result = parseDoc(data);
       fn(result);
       for (const t of docTasks(result)) if (!t.id) t.id = newId();
@@ -206,12 +269,40 @@ export class Store extends Events {
     });
     this.doc = result;
     this.trigger("changed");
+    if (undoLabel) this.trigger("undoable", undoLabel);
   }
 
-  async mutateHabits(fn: (h: HabitsData) => void) {
+  private pushUndo(label: string, path: string, text: string) {
+    this.undoStack.push({ label, path, text });
+    if (this.undoStack.length > 30) this.undoStack.shift();
+  }
+
+  canUndo() {
+    return this.undoStack.length > 0;
+  }
+
+  /** Put the file back as it was before the last undoable action. Returns that action's label. */
+  async undo(): Promise<string | null> {
+    const entry = this.undoStack.pop();
+    if (!entry) return null;
+    const file = this.app.vault.getAbstractFileByPath(entry.path);
+    if (!(file instanceof TFile)) return null;
+    await this.app.vault.process(file, () => {
+      this.lastWritten.set(entry.path, entry.text);
+      return entry.text;
+    });
+    if (entry.path === normalizePath(this.settings.tasksFile)) this.doc = parseDoc(entry.text);
+    else if (entry.path === normalizePath(this.settings.habitsFile)) this.habits = parseHabits(entry.text);
+    else if (entry.path === normalizePath(this.settings.goalsFile)) this.goals = parseGoals(entry.text);
+    this.trigger("changed");
+    return entry.label;
+  }
+
+  async mutateHabits(fn: (h: HabitsData) => void, undoLabel?: string) {
     const file = await this.ensureFile(this.settings.habitsFile, HABITS_HEADER);
     let result = this.habits;
     await this.app.vault.process(file, (data) => {
+      if (undoLabel) this.pushUndo(undoLabel, file.path, data);
       result = parseHabits(data);
       fn(result);
       const out = serializeHabits(result);
@@ -249,7 +340,7 @@ export class Store extends Events {
     if (isExternalId(id)) return;
     await this.mutate((doc) => {
       doc.lines = doc.lines.filter((l) => !(l.kind === "task" && l.task.id === id));
-    });
+    }, "Задача удалена");
   }
 
   async toggle(id: string) {
@@ -281,7 +372,7 @@ export class Store extends Events {
           doc.lines.splice(idx, 0, { kind: "task", task: clone });
         }
       }
-    });
+    }, this.find(id)?.done ? "Задача возвращена в работу" : "Задача выполнена");
   }
 
   /** Move a task to `due` (null = backlog), placing it before `beforeId` or at the end of that day. */
@@ -306,7 +397,35 @@ export class Store extends Events {
       let at = beforeId ? doc.lines.findIndex((l) => l.kind === "task" && l.task.id === beforeId) : -1;
       if (at < 0) at = insertIndexForDay(doc, due);
       doc.lines.splice(at, 0, line);
-    });
+    }, this.find(id)?.due === due ? undefined : `Перенесено: ${due ? humanDay(due) : "бэклог"}`);
+  }
+
+  // ---------- bulk (multi-select) ----------
+
+  async bulk(ids: string[], op: "done" | "remove" | { due: DateStr | null }) {
+    const own = ids.filter((id) => !isExternalId(id));
+    for (const id of ids.filter(isExternalId)) {
+      if (op === "done") await this.toggle(id);
+      else if (op !== "remove") await this.move(id, op.due, null);
+    }
+    if (!own.length) return;
+    const set = new Set(own);
+    const label = op === "done" ? `Выполнено задач: ${own.length}` : op === "remove" ? `Удалено задач: ${own.length}` : `Перенесено задач: ${own.length}`;
+    await this.mutate((doc) => {
+      if (op === "remove") {
+        doc.lines = doc.lines.filter((l) => !(l.kind === "task" && set.has(l.task.id)));
+        return;
+      }
+      for (const t of docTasks(doc)) {
+        if (!set.has(t.id)) continue;
+        if (op === "done") {
+          if (!t.done) { t.done = true; t.doneDate = today(); }
+        } else if (t.due !== op.due) {
+          if (!t.done && t.due && op.due && op.due > t.due && t.due <= today()) t.moved += 1;
+          t.due = op.due;
+        }
+      }
+    }, label);
   }
 
   async addMany(items: { task: Partial<Task>; due: DateStr | null }[]) {
@@ -323,6 +442,187 @@ export class Store extends Events {
     await this.mutate((doc) => {
       const t = docTasks(doc).find((x) => x.id === id);
       if (t) t.spent += minutes;
+    });
+  }
+
+  // ---------- backups ----------
+  // Planner/Backups/2026-11-03 Tasks.md (+ Habits, Goals), one set per day, last N days kept.
+
+  private backupSources() {
+    const s = this.settings;
+    return [s.tasksFile, s.habitsFile, s.goalsFile].map(normalizePath);
+  }
+
+  async backup(force = false): Promise<boolean> {
+    const folder = normalizePath(this.settings.backupsFolder);
+    const day = today();
+    const stamp = force ? `${day} ${new Date().toTimeString().slice(0, 5).replace(":", "-")}` : day;
+    let made = false;
+    for (const src of this.backupSources()) {
+      const file = this.app.vault.getAbstractFileByPath(src);
+      if (!(file instanceof TFile)) continue;
+      const target = `${folder}/${stamp} ${file.name}`;
+      if (this.app.vault.getAbstractFileByPath(target)) continue;
+      await this.ensureFile(target, await this.app.vault.read(file));
+      made = true;
+    }
+    await this.pruneBackups();
+    return made;
+  }
+
+  async listBackups(): Promise<string[]> {
+    const folder = this.app.vault.getAbstractFileByPath(normalizePath(this.settings.backupsFolder));
+    if (!(folder instanceof TFolder)) return [];
+    const stamps = new Set<string>();
+    for (const f of folder.children) {
+      const m = f.name.match(/^(\d{4}-\d{2}-\d{2}(?: \d{2}-\d{2})?) /);
+      if (m && f instanceof TFile) stamps.add(m[1]);
+    }
+    return [...stamps].sort().reverse();
+  }
+
+  private async pruneBackups() {
+    const folder = this.app.vault.getAbstractFileByPath(normalizePath(this.settings.backupsFolder));
+    if (!(folder instanceof TFolder)) return;
+    const cutoff = addDays(today(), -this.settings.backupDays);
+    for (const f of [...folder.children]) {
+      const m = f.name.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (f instanceof TFile && m && m[1] < cutoff) await this.app.vault.delete(f);
+    }
+  }
+
+  /** Restore all planner files from a backup set (the current state is backed up first). */
+  async restore(stamp: string) {
+    await this.backup(true);
+    const folder = normalizePath(this.settings.backupsFolder);
+    for (const src of this.backupSources()) {
+      const name = src.split("/").pop()!;
+      const copy = this.app.vault.getAbstractFileByPath(`${folder}/${stamp} ${name}`);
+      const file = this.app.vault.getAbstractFileByPath(src);
+      if (!(copy instanceof TFile) || !(file instanceof TFile)) continue;
+      const text = await this.app.vault.read(copy);
+      await this.app.vault.process(file, () => {
+        this.lastWritten.set(src, text);
+        return text;
+      });
+    }
+    this.undoStack = [];
+    await this.init();
+  }
+
+  // ---------- iCloud conflict copies ("Tasks 2.md") ----------
+
+  isConflictCopy(path: string): boolean {
+    return this.backupSources().some((src) => {
+      const dir = src.split("/").slice(0, -1).join("/");
+      const base = src.split("/").pop()!.replace(/\.md$/, "");
+      const esc = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(`^${dir ? dir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "/" : ""}${esc}( \\d+| \\(.+\\))\\.md$`);
+      return re.test(path);
+    });
+  }
+
+  findConflicts(): TFile[] {
+    return this.app.vault.getMarkdownFiles().filter((f) => this.isConflictCopy(f.path));
+  }
+
+  /** Merge a conflict copy into the main file, then move the copy into Backups. */
+  async mergeConflict(copy: TFile): Promise<string> {
+    const text = await this.app.vault.read(copy);
+    const s = this.settings;
+    const base = (p: string) => p.split("/").pop()!.replace(/\.md$/, "");
+    let summary = "";
+    if (copy.basename.startsWith(base(s.tasksFile))) {
+      const theirs = docTasks(parseDoc(text));
+      let added = 0, completed = 0;
+      await this.mutate((doc) => {
+        const mine = new Map(docTasks(doc).map((t) => [t.id, t]));
+        for (const t of theirs) {
+          const m = t.id ? mine.get(t.id) : undefined;
+          if (!m) {
+            if (!t.id) t.id = newId();
+            doc.lines.splice(insertIndexForDay(doc, t.due), 0, { kind: "task", task: t });
+            added++;
+          } else if (t.done && !m.done) {
+            m.done = true;
+            m.doneDate = t.doneDate ?? today();
+            completed++;
+          }
+        }
+      }, "Слияние копии iCloud");
+      summary = `добавлено ${added}, отмечено выполненными ${completed}`;
+    } else if (copy.basename.startsWith(base(s.habitsFile))) {
+      const theirs = parseHabits(text);
+      await this.mutateHabits((h) => {
+        for (const x of theirs.habits) if (!h.habits.some((y) => y.id === x.id)) h.habits.push(x);
+        for (const [d, ids] of theirs.log) h.log.set(d, new Set([...(h.log.get(d) ?? []), ...ids]));
+      }, "Слияние копии iCloud");
+      summary = "привычки и отметки объединены";
+    } else {
+      const theirs = parseGoals(text);
+      await this.mutateGoals((g) => {
+        for (const [wk, list] of theirs) {
+          const cur = g.get(wk) ?? [];
+          for (const x of list) if (!cur.some((y) => y.id === x.id)) cur.push(x);
+          g.set(wk, cur);
+        }
+      });
+      summary = "цели объединены";
+    }
+    const folder = normalizePath(s.backupsFolder);
+    if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+    await this.app.vault.rename(copy, `${folder}/${today()} конфликт ${copy.name}`);
+    return summary;
+  }
+
+  // ---------- weekly goals ----------
+  // Goals.md: "## 2026-W45" then "- [ ] Title 🆔 id"
+
+  goalsFor(weekStart: DateStr): Goal[] {
+    return this.goals.get(weekKey(weekStart)) ?? [];
+  }
+
+  findGoal(id: string): Goal | undefined {
+    for (const list of this.goals.values()) {
+      const g = list.find((x) => x.id === id);
+      if (g) return g;
+    }
+    return undefined;
+  }
+
+  async mutateGoals(fn: (g: Map<string, Goal[]>) => void) {
+    const file = await this.ensureFile(this.settings.goalsFile, GOALS_HEADER);
+    let result = this.goals;
+    await this.app.vault.process(file, (data) => {
+      this.pushUndo("Цели изменены", file.path, data);
+      result = parseGoals(data);
+      fn(result);
+      const out = serializeGoals(result);
+      this.lastWritten.set(file.path, out);
+      return out;
+    });
+    this.goals = result;
+    this.trigger("changed");
+  }
+
+  async addGoal(weekStart: DateStr, title: string) {
+    const id = newId();
+    await this.mutateGoals((g) => g.set(weekKey(weekStart), [...(g.get(weekKey(weekStart)) ?? []), { id, title, done: false }]));
+    return id;
+  }
+
+  async updateGoal(id: string, patch: Partial<Goal>) {
+    await this.mutateGoals((g) => {
+      for (const list of g.values()) {
+        const x = list.find((y) => y.id === id);
+        if (x) Object.assign(x, patch);
+      }
+    });
+  }
+
+  async removeGoal(id: string) {
+    await this.mutateGoals((g) => {
+      for (const [k, list] of g) g.set(k, list.filter((x) => x.id !== id));
     });
   }
 
@@ -431,7 +731,8 @@ export class Store extends Events {
     if (!(folder instanceof TFolder)) return [];
     const out: Task[] = [];
     for (const f of folder.children) {
-      if (f instanceof TFile && f.extension === "md") out.push(...docTasks(parseDoc(await this.app.vault.cachedRead(f))));
+      if (f instanceof TFile && f.extension === "md")
+        out.push(...docTasks(parseDoc(await this.app.vault.cachedRead(f))).map((t) => ({ ...t, archivePath: f.path })));
     }
     return out;
   }
@@ -524,4 +825,38 @@ export function serializeHabits(h: HabitsData): string {
   out.push("", "## Журнал", "");
   for (const d of [...h.log.keys()].sort().reverse()) out.push(`- ${d}: ${[...h.log.get(d)!].join(", ")}`);
   return out.join("\n") + "\n";
+}
+
+export function weekKey(weekStart: DateStr): string {
+  return `${addDays(weekStart, 3).slice(0, 4)}-W${String(isoWeek(weekStart)).padStart(2, "0")}`;
+}
+
+const GOALS_HEADER = "# Цели недели\n";
+
+export function parseGoals(text: string): Map<string, Goal[]> {
+  const out = new Map<string, Goal[]>();
+  let cur: Goal[] | null = null;
+  for (const line of text.split(/\r?\n/)) {
+    const h = line.match(/^##\s+(\d{4}-W\d{2})/);
+    if (h) {
+      cur = out.get(h[1]) ?? [];
+      out.set(h[1], cur);
+      continue;
+    }
+    const m = line.match(/^- \[([ xX])\] (.+?)\s*🆔\s*([\w-]+)\s*$/u);
+    if (m && cur) cur.push({ id: m[3], title: m[2].trim(), done: m[1] !== " " });
+  }
+  return out;
+}
+
+export function serializeGoals(goals: Map<string, Goal[]>): string {
+  const out = [GOALS_HEADER];
+  for (const k of [...goals.keys()].sort().reverse()) {
+    const list = goals.get(k)!;
+    if (!list.length) continue;
+    out.push(`## ${k}`);
+    for (const g of list) out.push(`- [${g.done ? "x" : " "}] ${g.title} 🆔 ${g.id}`);
+    out.push("");
+  }
+  return out.join("\n");
 }

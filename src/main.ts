@@ -1,4 +1,4 @@
-import { App, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
+import { App, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, WorkspaceLeaf, normalizePath, requestUrl } from "obsidian";
 import { DateStr, addDays, startOfWeek, today, weekday } from "./dates";
 import { dailyTemplate, registerDailyBlocks } from "./daily";
 import { FocusTimer, FocusView, VIEW_FOCUS, fmtClock } from "./focus";
@@ -7,6 +7,7 @@ import { injectNavbarButton, removeNavbarButton } from "./navbar";
 import { Task, displayTitle } from "./model";
 import { TaskModal } from "./modal";
 import { PromptModal, TaskPalette } from "./palette";
+import { parseQuick } from "./quickadd";
 import { PlanningModal } from "./planning";
 import { buildReview, reviewPath } from "./review";
 import { DEFAULT_SETTINGS, PlannerSettings, Store } from "./store";
@@ -47,10 +48,37 @@ export default class WeekPlannerPlugin extends Plugin {
     cmd("review-last-week", "Итоги прошлой недели", () => this.createReview(addDays(startOfWeek(today()), -7)));
     cmd("open-daily", "Заметка дня (сегодня)", () => this.openDaily(today()));
     cmd("pomodoro-toggle", "Помодоро: старт/пауза", () => this.focus.toggle());
+    cmd("undo", "Отменить последнее действие", async () => {
+      const label = await this.store.undo();
+      new Notice(label ? `Отменено: ${label.toLowerCase()}` : "Нечего отменять");
+    });
+    cmd("backup-now", "Сделать резервную копию сейчас", async () => {
+      await this.store.backup(true);
+      new Notice("Резервная копия сохранена");
+    });
+    cmd("restore-backup", "Восстановить из резервной копии…", () => this.openRestore());
+    cmd("merge-conflicts", "Слить копии iCloud (конфликты)", () => this.checkConflicts(true));
+    cmd("refresh-calendars", "Обновить календари", () => this.refreshCalendars(true));
     cmd("rollover", "Перенести невыполненные задачи на сегодня", async () => new Notice(`Перенесено задач: ${await this.store.rollover()}`));
     cmd("archive", "Архивировать старые выполненные задачи", async () => new Notice(`В архив: ${await this.store.archiveOld()}`));
 
     this.addSettingTab(new PlannerSettingTab(this.app, this));
+
+    // obsidian://planner-add?text=завтра 10:00 созвон  — used by Siri / Shortcuts / Share sheet.
+    this.registerObsidianProtocolHandler("planner-add", async (params) => {
+      const text = (params.text ?? params.title ?? "").trim();
+      if (!text) return;
+      const q = parseQuick(text, today());
+      if (!q.task.title) return;
+      if (params.url) q.task.title += ` ${params.url}`;
+      const due = q.due !== undefined ? q.due : params.backlog ? null : today();
+      await this.store.add(q.task, due);
+      new Notice(`Задача добавлена: ${q.task.title}${due ? "" : " (бэклог)"}`);
+    });
+    this.registerObsidianProtocolHandler("planner", () => this.activateWeek());
+
+    this.registerEvent(this.store.on("undoable", (label) => this.offerUndo(String(label))));
+    this.registerEvent(this.store.on("conflict", () => this.checkConflicts(false)));
 
     if (!Platform.isMobile) {
       this.statusEl = this.addStatusBarItem();
@@ -73,6 +101,9 @@ export default class WeekPlannerPlugin extends Plugin {
         if (f instanceof TFile && f.extension === "md") this.app.vault.cachedRead(f).then((d) => this.store.onNoteChanged(f.path, d));
       }));
       await this.store.scanExternal();
+      this.checkConflicts(false);
+      this.refreshCalendars(false);
+      this.registerInterval(window.setInterval(() => this.refreshCalendars(false), 30 * 60_000));
       if (this.settings.openOnStartup && !this.app.workspace.getLeavesOfType(VIEW_WEEK).length) await this.activateWeek();
       this.maybePromptPlanning();
       this.setupNavbarButton();
@@ -122,9 +153,87 @@ export default class WeekPlannerPlugin extends Plugin {
         }
       }
       await this.store.archiveOld();
+      await this.store.backup();
     } catch (e) {
       console.error("Week Planner maintenance failed", e);
     }
+  }
+
+  // ---------- undo toast ----------
+
+  private offerUndo(label: string) {
+    // Always for destructive/bulk actions; on the phone also for single moves and checks,
+    // where a stray swipe is easy.
+    const always = /удален|Удалено|задач:|Слияние/.test(label);
+    if (!always && !Platform.isPhone) return;
+    const frag = document.createDocumentFragment();
+    frag.createSpan({ text: label + "  " });
+    const btn = frag.createEl("button", { text: "Отменить", cls: "wp-notice-btn" });
+    const notice = new Notice(frag, 5000);
+    btn.onclick = async () => {
+      notice.hide();
+      await this.store.undo();
+    };
+  }
+
+  // ---------- iCloud conflicts ----------
+
+  private async checkConflicts(manual: boolean) {
+    const copies = this.store.findConflicts();
+    if (!copies.length) {
+      if (manual) new Notice("Конфликтных копий нет");
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    frag.createDiv({ text: `iCloud создал копию: ${copies.map((f) => f.name).join(", ")}. Часть изменений с другого устройства может быть только в ней.` });
+    const btn = frag.createEl("button", { text: "Слить в основной файл", cls: "mod-cta wp-notice-btn" });
+    const notice = new Notice(frag, 0);
+    btn.onclick = async () => {
+      notice.hide();
+      for (const f of copies) new Notice(`${f.name}: ${await this.store.mergeConflict(f)}`, 6000);
+    };
+  }
+
+  // ---------- backups ----------
+
+  private async openRestore() {
+    const list = await this.store.listBackups();
+    if (!list.length) return new Notice("Резервных копий пока нет");
+    new RestoreModal(this.app, list, async (stamp) => {
+      await this.store.restore(stamp);
+      new Notice(`Восстановлено из копии ${stamp}. Текущее состояние тоже сохранено в копиях.`);
+    }).open();
+  }
+
+  // ---------- calendars ----------
+
+  async refreshCalendars(manual: boolean) {
+    const urls = this.settings.calendars.map((u) => u.trim().replace(/^webcal:/i, "https:")).filter(Boolean);
+    if (!urls.length) {
+      this.store.setFeeds([]);
+      if (manual) new Notice("Календари не подключены — добавь ссылку в настройках");
+      return;
+    }
+    const feeds: string[] = [];
+    let failed = 0;
+    for (const url of urls) {
+      try {
+        feeds.push((await requestUrl({ url, throw: true })).text);
+      } catch (e) {
+        console.error("Week Planner: calendar fetch failed", url, e);
+        feeds.push("");
+        failed++;
+      }
+    }
+    this.store.setFeeds(feeds);
+    if (manual || failed) new Notice(failed ? `Не удалось загрузить календарей: ${failed}` : "Календари обновлены");
+  }
+
+  async openArchived(t: Task) {
+    if (!t.archivePath) return;
+    const text = await this.app.vault.cachedRead(this.app.vault.getAbstractFileByPath(t.archivePath) as TFile);
+    const line = text.split("\n").findIndex((l) => l.includes(`🆔 ${t.id}`));
+    await this.openFile(t.archivePath, line >= 0 ? line : undefined);
   }
 
   // ---------- reminders ----------
@@ -291,7 +400,7 @@ class PlannerSettingTab extends PluginSettingTab {
     const text = (name: string, desc: string, key: TextKey) =>
       new Setting(containerEl).setName(name).setDesc(desc).addText((t) =>
         t.setValue(s[key]).onChange(async (v) => { s[key] = v.trim() || DEFAULT_SETTINGS[key]; await save(); }));
-    const num = (name: string, desc: string, key: "archiveAfterDays" | "reminderMinutes" | "pomodoroMinutes" | "breakMinutes" | "timelineStart" | "timelineEnd", min: number, max: number) =>
+    const num = (name: string, desc: string, key: "archiveAfterDays" | "reminderMinutes" | "pomodoroMinutes" | "breakMinutes" | "timelineStart" | "timelineEnd" | "backupDays", min: number, max: number) =>
       new Setting(containerEl).setName(name).setDesc(desc).addText((t) =>
         t.setValue(String(s[key])).onChange(async (v) => {
           const n = parseInt(v);
@@ -329,6 +438,22 @@ class PlannerSettingTab extends PluginSettingTab {
     num("Перерыв, минут", "", "breakMinutes", 1, 60);
     toggle("Открывать неделю при запуске", "", "openOnStartup");
 
+    new Setting(containerEl).setName("Календари").setHeading();
+    new Setting(containerEl).setName("Ссылки на календари (ICS)")
+      .setDesc("По одной ссылке в строке. События показываются на шкале и в загрузке дня, только для чтения. Как получить ссылку — в заметке «Как пользоваться».")
+      .addTextArea((t) => {
+        t.setPlaceholder("https://calendar.google.com/calendar/ical/…/basic.ics").setValue(s.calendars.join("\n"));
+        t.inputEl.rows = 3;
+        t.inputEl.addEventListener("blur", async () => {
+          s.calendars = t.getValue().split("\n").map((x) => x.trim()).filter(Boolean);
+          await save();
+          this.plugin.refreshCalendars(true);
+        });
+      });
+
+    new Setting(containerEl).setName("Резервные копии").setHeading();
+    num("Хранить копии, дней", "Копия задач, привычек и целей делается раз в день в папку Planner/Backups", "backupDays", 3, 365);
+
     new Setting(containerEl).setName("iPhone").setHeading();
     new Setting(containerEl).setName("Кнопка «+» в нижней панели")
       .setDesc("Добавляет в нижнюю панель Obsidian кнопку новой задачи. Неофициальный способ: после обновления Obsidian кнопка может пропасть — тогда просто выключи.")
@@ -337,5 +462,31 @@ class PlannerSettingTab extends PluginSettingTab {
         await save();
         this.plugin.setupNavbarButton();
       }));
+  }
+}
+
+class RestoreModal extends Modal {
+  constructor(app: App, private stamps: string[], private onPick: (stamp: string) => void) {
+    super(app);
+  }
+
+  onOpen() {
+    this.modalEl.addClass("wp-modal");
+    this.titleEl.setText("Восстановить из резервной копии");
+    this.contentEl.createDiv({ cls: "wp-muted", text: "Задачи, привычки и цели вернутся к выбранной копии. Текущее состояние перед этим тоже сохранится в копиях." });
+    const list = this.contentEl.createDiv("wp-restore-list");
+    for (const st of this.stamps) {
+      const row = list.createDiv("wp-restore-row");
+      row.createSpan({ text: st.replace(/ (\d{2})-(\d{2})$/, " $1:$2") });
+      const b = row.createEl("button", { text: "Восстановить" });
+      b.onclick = () => {
+        this.close();
+        this.onPick(st);
+      };
+    }
+  }
+
+  onClose() {
+    this.contentEl.empty();
   }
 }

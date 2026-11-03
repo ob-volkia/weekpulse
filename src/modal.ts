@@ -1,6 +1,6 @@
 import { App, Modal, Notice, Platform } from "obsidian";
-import { DAY_SHORT, DateStr, fmtMinutes, weekday } from "./dates";
-import { PRIORITY_LABEL, Priority, Task, emptyTask, parseDuration, recurrenceLabel, weekOnRule } from "./model";
+import { DAY_SHORT, DateStr, fmtMinutes, startOfWeek, today, weekday } from "./dates";
+import { PRIORITY_LABEL, Priority, Task, emptyTask, parseDuration, recurrenceLabel, setTaskNotes, taskNotes, weekOnRule } from "./model";
 import { parseQuick } from "./quickadd";
 import { Store } from "./store";
 import type WeekPlannerPlugin from "./main";
@@ -109,6 +109,29 @@ export class TaskModal extends Modal {
       };
     }
 
+    // deadline
+    const dlCtl = field("Дедлайн");
+    const dl = dlCtl.createEl("input", { attr: { type: "date" } });
+    dl.value = t.deadline ?? "";
+    dl.addEventListener("change", () => (t.deadline = dl.value || null));
+    if (t.deadline) {
+      const clr = dlCtl.createEl("button", { text: "Убрать", cls: "wp-chip-btn" });
+      clr.onclick = () => { t.deadline = null; dl.value = ""; clr.remove(); };
+    }
+
+    // weekly goal
+    const weekOf = t.due ?? today();
+    const goals = this.store.goalsFor(startOfWeek(weekOf));
+    if (goals.length || t.goal) {
+      const gCtl = field("Цель недели");
+      const gs = gCtl.createEl("select", { cls: "dropdown" });
+      gs.createEl("option", { value: "", text: "Без цели" });
+      for (const g of goals) gs.createEl("option", { value: g.id, text: g.title });
+      if (t.goal && !goals.some((g) => g.id === t.goal)) gs.createEl("option", { value: t.goal, text: this.store.findGoal(t.goal)?.title ?? "Цель другой недели" });
+      gs.value = t.goal ?? "";
+      gs.addEventListener("change", () => (t.goal = gs.value || null));
+    }
+
     // recurrence
     const recCtl = field("Повтор");
     const sel = recCtl.createEl("select", { cls: "dropdown" });
@@ -147,6 +170,13 @@ export class TaskModal extends Modal {
       renderDays();
     });
     renderDays();
+
+    // notes
+    const notesWrap = c.createDiv("wp-notes");
+    notesWrap.createDiv({ cls: "wp-field-label", text: "Заметки" });
+    const notes = notesWrap.createEl("textarea", { attr: { rows: "3", placeholder: "Детали, ссылки, [[заметки]]…" } });
+    notes.value = taskNotes(t);
+    notes.addEventListener("input", () => setTaskNotes(t, notes.value));
 
     // subtasks
     const subWrap = c.createDiv("wp-subtasks");
@@ -238,6 +268,7 @@ export class TaskModal extends Modal {
       if (q.task.duration && !t.duration) merged.duration = q.task.duration;
       if (q.task.priority && !t.priority) merged.priority = q.task.priority;
       if (q.task.recurrence && !t.recurrence) merged.recurrence = q.task.recurrence;
+      if (q.task.deadline && !t.deadline) merged.deadline = q.task.deadline;
       merged.tags = [...new Set([...t.tags, ...(q.task.tags ?? [])])];
       if (!merged.title?.trim()) return;
       const due = q.due !== undefined ? q.due : t.due;

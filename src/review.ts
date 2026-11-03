@@ -36,6 +36,16 @@ export function buildReview(store: Store, archive: Task[], weekStart: DateStr): 
   out.push(`| Оценка выполненного | ${fmtMinutes(estimated) || "—"} |`);
   out.push(`| Переносилось | ${planned.filter((t) => t.moved > 0).length} задач |`, "");
 
+  const goals = store.goalsFor(weekStart);
+  if (goals.length) {
+    out.push("## Цели недели", "");
+    for (const g of goals) {
+      const linked = all.filter((t) => t.goal === g.id);
+      out.push(`- [${g.done ? "x" : " "}] ${g.title}${linked.length ? ` — задач ${linked.filter((t) => t.done).length}/${linked.length}` : ""}`);
+    }
+    out.push("");
+  }
+
   out.push("## По дням", "");
   for (const d of days) {
     const list = planned.filter((t) => t.due === d || t.doneDate === d);
