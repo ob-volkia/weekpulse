@@ -192,7 +192,7 @@ export class HabitsView extends ItemView {
       spent && est ? (spent > est ? `недооценка на ${Math.round((spent / est - 1) * 100)}%` : `уложился, запас ${Math.round((1 - spent / est) * 100)}%`) : "запускай помодоро, чтобы считать факт");
     tile("Переносились", String(moved), moved ? "задач сдвигались хотя бы раз" : "ничего не откладывали");
     const bestHabit = this.store.habits.habits.map((h) => ({ h, s: this.store.streak(h).current })).sort((a, b) => b.s - a.s)[0];
-    const bt = tile("Лучшая серия", bestHabit?.s ? String(bestHabit.s) : "—", bestHabit?.s ? bestHabit.h.name : "привычек пока нет");
+    const bt = tile("Лучшая серия", bestHabit?.s ? String(bestHabit.s) : "—", bestHabit?.s ? bestHabit.h.name : this.store.habits.habits.length ? "серий пока нет" : "привычек пока нет");
     if (bestHabit?.s) bt.querySelector(".wp-tile-value")!.prepend(icon(bt, ICON.streak, "wp-streak"));
 
     // per-day bars: done vs planned (one series: done; the track is the plan)
