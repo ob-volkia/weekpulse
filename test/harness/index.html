@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Week Planner harness</title>
+<style>
+:root{--background-primary:#1e1e1e;--background-primary-alt:#242424;--background-secondary:#262626;--background-modifier-border:#363636;--background-modifier-border-hover:#4a4a4a;--background-modifier-hover:rgba(255,255,255,.075);--text-normal:#dadada;--text-muted:#a3a3a3;--text-faint:#666;--text-accent:#a68af9;--text-on-accent:#fff;--interactive-accent:#7f6df2;--color-red:#fb464c;--color-orange:#e9973f;--color-yellow:#e0de71;--color-green:#44cf6e;--color-cyan:#53dfdd;--color-blue:#027aff;--color-purple:#a882ff;--color-pink:#fa99cd;--font-ui-smaller:12px;--font-ui-small:13px;--font-ui-medium:15px;--font-ui-large:20px;--shadow-s:0 1px 3px rgba(0,0,0,.4);--shadow-l:0 8px 24px rgba(0,0,0,.5)}
+html,body{margin:0;height:100%;background:var(--background-primary);color:var(--text-normal);font-family:-apple-system,BlinkMacSystemFont,"Inter",sans-serif}
+#app{height:100vh;box-sizing:border-box;overflow:hidden}
+button{font:inherit;color:var(--text-normal);background:var(--background-modifier-hover);border:0;border-radius:4px;cursor:pointer;padding:4px 10px}
+input,select{font:inherit;color:var(--text-normal);background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:4px;padding:2px 6px;box-sizing:border-box}
+button.mod-cta{background:var(--interactive-accent);color:#fff} button.mod-warning{background:var(--color-red);color:#fff}
+.modal-container{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:50}
+.modal{background:var(--background-primary);border:1px solid var(--background-modifier-border);border-radius:8px;padding:16px;max-height:90vh;overflow:auto}
+.modal-title{font-weight:700;margin-bottom:10px}
+.menu{background:var(--background-secondary);border:1px solid var(--background-modifier-border);border-radius:6px;padding:4px;font-size:13px}
+.menu-item{padding:4px 10px;cursor:pointer;border-radius:4px}.menu-item:hover{background:var(--background-modifier-hover)}
+.menu-separator{height:1px;background:var(--background-modifier-border);margin:3px 0}
+.notice{position:fixed;top:10px;right:10px;background:var(--background-secondary);padding:8px 12px;border-radius:6px;border:1px solid var(--background-modifier-border);z-index:100}
+</style>
+<link rel="stylesheet" href="styles.css"></head><body><div id="app"></div><script src="harness.js"></script></body></html>
