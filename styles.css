@@ -782,3 +782,18 @@ button.wp-danger { color: var(--color-red); }
 /* phone: three modes + five icons must fit one row */
 .wp-root.is-mobile button.wp-seg-btn { padding: 0 9px; }
 .wp-root.is-mobile .wp-m-row button.wp-icon-btn { width: 31px; }
+/* timeline blocks: title + one line of details, never clipped mid-line */
+.wp-card.wp-tl-block { display: flex; flex-direction: column; }
+.wp-card.wp-tl-block .wp-card-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wp-card.wp-tl-block .wp-card-meta { margin-top: 1px; }
+/* trends */
+.wp-trend-bars, .wp-trend-days { height: 140px; }
+.wp-vbar-track.is-solid { border: none; background: color-mix(in srgb, var(--interactive-accent) 35%, var(--background-modifier-border)); border-radius: 4px 4px 0 0; }
+.wp-vbar-track.is-best { background: var(--interactive-accent); }
+.wp-chart-note { margin-top: 6px; font-size: var(--font-ui-smaller); }
+.wp-trend-row { grid-template-columns: 110px 1fr 64px 52px; }
+.wp-hbar-fill.wp-hbar-solid { border-radius: 0 4px 4px 0; height: 10px; }
+.wp-spark { display: flex; align-items: flex-end; gap: 1px; height: 16px; }
+.wp-spark-bar { flex: 1; background: var(--text-faint); border-radius: 1px; min-width: 2px; }
+.wp-accuracy { font-size: var(--font-ui-medium); font-weight: 600; margin-bottom: 2px; }
+@media (max-width: 720px) { .wp-trend-row { grid-template-columns: 90px 1fr 48px 44px; } }

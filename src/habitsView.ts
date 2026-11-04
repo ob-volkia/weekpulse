@@ -5,12 +5,14 @@ import { Habit, Store } from "./store";
 import { tagColor } from "./weekView";
 import type WeekPlannerPlugin from "./main";
 import { ICON, icon, iconButton, iconText } from "./ui";
+import { Bucket, computeTrends } from "./trends";
 
 export const VIEW_HABITS = "week-planner-habits";
 
 export class HabitsView extends ItemView {
   private weekStart = startOfWeek(today());
   private archive: Task[] = [];
+  private trendWeeks = 8;
 
   constructor(leaf: WorkspaceLeaf, private plugin: WeekPlannerPlugin) {
     super(leaf);
@@ -52,6 +54,7 @@ export class HabitsView extends ItemView {
     const page = root.createDiv("wp-page");
     this.renderHabits(page);
     this.renderStats(page);
+    this.renderTrends(page);
     root.scrollTop = top;
   }
 
@@ -159,6 +162,92 @@ export class HabitsView extends ItemView {
   }
 
   // ---------- stats ----------
+
+  // ---------- trends ----------
+
+  private renderTrends(page: HTMLElement) {
+    const sec = page.createDiv("wp-section");
+    const head = sec.createDiv("wp-section-head");
+    head.createEl("h3", { text: "Тренды" });
+    const seg = head.createDiv("wp-segmented wp-mode");
+    for (const n of [4, 8, 12]) {
+      const b = seg.createEl("button", { text: `${n} нед.`, cls: `wp-seg-btn ${this.trendWeeks === n ? "is-active" : ""}` });
+      b.onclick = () => { this.trendWeeks = n; this.render(); };
+    }
+    const tr = computeTrends([...this.store.all(), ...this.archive], today(), this.trendWeeks);
+    if (!tr.weeks.some((w) => w.planned || w.done)) {
+      sec.createDiv({ cls: "wp-empty", text: "Данных пока мало: тренды появятся через пару недель работы с планером." });
+      return;
+    }
+
+    // Completion per week: outline = planned, fill = done.
+    const wc = sec.createDiv("wp-chart");
+    wc.createDiv({ cls: "wp-chart-title", text: "Выполнение по неделям" });
+    const bars = wc.createDiv("wp-bars wp-trend-bars");
+    bars.style.gridTemplateColumns = `repeat(${tr.weeks.length}, 1fr)`;
+    const max = Math.max(1, ...tr.weeks.map((w) => w.planned));
+    const thisWeek = startOfWeek(today());
+    for (const w of tr.weeks) {
+      const pct = w.planned ? Math.round((w.done / w.planned) * 100) : 0;
+      const col = bars.createDiv({ cls: "wp-bar-col", attr: { "aria-label": `${weekLabel(w.start)}: ${w.done} из ${w.planned} (${pct}%), в работе ${fmtMinutes(w.minutes) || "0"}, переносились ${w.moved}` } });
+      col.createDiv({ cls: "wp-bar-value", text: w.planned ? `${pct}%` : "" });
+      const track = col.createDiv("wp-vbar-track");
+      track.style.height = `${(w.planned / max) * 100}%`;
+      track.createDiv("wp-vbar-fill").style.height = w.planned ? `${(w.done / w.planned) * 100}%` : "0";
+      col.createDiv({ cls: `wp-bar-label ${w.start === thisWeek ? "is-today" : ""}`, text: `${dayNum(w.start)}.${w.start.slice(5, 7)}` });
+    }
+    const total = tr.weeks.reduce((a, w) => ({ p: a.p + w.planned, d: a.d + w.done, m: a.m + w.minutes }), { p: 0, d: 0, m: 0 });
+    wc.createDiv({ cls: "wp-muted wp-chart-note", text: `За ${this.trendWeeks} нед.: выполнено ${total.d} из ${total.p} (${total.p ? Math.round((total.d / total.p) * 100) : 0}%), в работе ${fmtMinutes(total.m) || "0"}` });
+
+    // Best weekdays: average finished tasks per weekday.
+    const dc = sec.createDiv("wp-chart");
+    dc.createDiv({ cls: "wp-chart-title", text: "Продуктивные дни" });
+    const dbars = dc.createDiv("wp-bars wp-trend-days");
+    const dmax = Math.max(0.0001, ...tr.weekdays.map((d) => d.avg));
+    const best = tr.weekdays.findIndex((d) => d.avg === dmax);
+    tr.weekdays.forEach((d, i) => {
+      const col = dbars.createDiv({ cls: "wp-bar-col", attr: { "aria-label": `${DAY_SHORT[i]}: в среднем ${d.avg.toFixed(1)} задач (всего ${d.done})` } });
+      col.createDiv({ cls: "wp-bar-value", text: d.done ? d.avg.toFixed(1) : "" });
+      const track = col.createDiv(`wp-vbar-track is-solid ${i === best && d.done ? "is-best" : ""}`);
+      track.style.height = `${(d.avg / dmax) * 100}%`;
+      col.createDiv({ cls: "wp-bar-label", text: DAY_SHORT[i] });
+    });
+    if (tr.weekdays[best]?.done) dc.createDiv({ cls: "wp-muted wp-chart-note", text: `Больше всего успеваешь по ${["понедельникам", "вторникам", "средам", "четвергам", "пятницам", "субботам", "воскресеньям"][best]}` });
+
+    // Where the time goes.
+    if (tr.tags.length) this.renderBuckets(sec, "Время по тегам", tr.tags, true);
+    if (tr.projects.length) this.renderBuckets(sec, "Время по проектам", tr.projects, false);
+
+    // Estimate accuracy.
+    const ac = sec.createDiv("wp-chart");
+    ac.createDiv({ cls: "wp-chart-title", text: "Точность оценок" });
+    const a = tr.accuracy;
+    if (!a) ac.createDiv({ cls: "wp-muted", text: "Указывай длительность задач и запускай помодоро — тогда здесь будет видно, насколько точно ты оцениваешь время." });
+    else {
+      const diff = Math.round((a.ratio - 1) * 100);
+      ac.createDiv({ cls: "wp-accuracy", text: Math.abs(diff) < 5 ? "Оцениваешь время точно" : diff > 0 ? `Задачи занимают на ${diff}% больше, чем планируешь` : `Задачи занимают на ${-diff}% меньше, чем планируешь` });
+      ac.createDiv({ cls: "wp-muted", text: `По ${a.count} задачам с оценкой и замером в фокусе · дольше плана: ${Math.round(a.over * 100)}%` });
+    }
+  }
+
+  private renderBuckets(sec: HTMLElement, title: string, list: Bucket[], tags: boolean) {
+    const c = sec.createDiv("wp-chart");
+    c.createDiv({ cls: "wp-chart-title", text: title });
+    const top = list.slice(0, 8);
+    const max = Math.max(1, ...top.map((b) => b.minutes));
+    for (const b of top) {
+      const row = c.createDiv({ cls: "wp-hbar-row wp-trend-row", attr: { "aria-label": `${b.name}: ${fmtMinutes(b.minutes) || "0"}, задач ${b.done}` } });
+      row.createDiv({ cls: "wp-hbar-label", text: tags && b.name !== "без тега" ? "#" + b.name : b.name });
+      const track = row.createDiv("wp-hbar-track");
+      const fill = track.createDiv(`wp-hbar-fill wp-hbar-solid ${tags && b.name !== "без тега" ? `tag-c${tagColor(b.name)}` : "wp-hbar-accent"}`);
+      fill.style.width = `${(b.minutes / max) * 100}%`;
+      const spark = row.createDiv("wp-spark");
+      const smax = Math.max(1, ...b.weekly);
+      for (const m of b.weekly) spark.createDiv("wp-spark-bar").style.height = `${Math.max(m ? 12 : 0, (m / smax) * 100)}%`;
+      row.createDiv({ cls: "wp-hbar-value", text: fmtMinutes(b.minutes) || `${b.done} зад.` });
+    }
+    if (list.length > top.length) c.createDiv({ cls: "wp-muted", text: `и ещё ${list.length - top.length}` });
+  }
 
   private renderStats(page: HTMLElement) {
     const sec = page.createDiv("wp-section");

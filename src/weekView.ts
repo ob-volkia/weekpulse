@@ -16,7 +16,8 @@ import { ICON, icon, iconText } from "./ui";
 export const VIEW_WEEK = "week-planner-view";
 const BACKLOG = "backlog";
 const MOBILE_BREAKPOINT = 720;
-const HOUR_PX = 44;
+const HOUR_PX = 56;
+const MIN_BLOCK_PX = 46; // a block always fits the title and one line of details
 export const STALE_AT = 5;
 
 type Mode = "week" | "month" | "timeline";
@@ -779,7 +780,7 @@ export class WeekView extends ItemView {
     }
     // Lay overlapping blocks side by side.
     const items = this.tasksFor(d).filter((t) => t.time)
-      .map((t) => ({ t, start: toMin(t.time!), end: toMin(t.time!) + Math.max(t.duration || 30, 20), lane: 0, lanes: 1 }));
+      .map((t) => ({ t, start: toMin(t.time!), end: toMin(t.time!) + Math.max(t.duration || 30, Math.ceil((MIN_BLOCK_PX / HOUR_PX) * 60)), lane: 0, lanes: 1 }));
     items.sort((a, b) => a.start - b.start);
     let cluster: typeof items = [];
     let clusterEnd = -1;

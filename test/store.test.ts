@@ -4,6 +4,8 @@ import { expandEvents } from "../src/ics";
 import { parseQuick } from "../src/quickadd";
 import { parseBody, serializeBody } from "../src/tasknotes";
 import { mergeTasks } from "../src/merge";
+import { computeTrends } from "../src/trends";
+import { parseDoc as pd, docTasks as dt } from "../src/model";
 import { parseHabits, serializeHabits } from "../src/store";
 import { today, addDays, startOfWeek, weekday } from "../src/dates";
 
@@ -234,6 +236,24 @@ END:VCALENDAR`;
     await store.saveBody("x", "X", { description: "", links: [], files: [used], comments: [] });
     eq("only orphan reported", (await store.findUnusedAttachments()).map((f) => f.path), ["Planner/Attachments/x-orphan.png"]);
     void vault;
+  }
+  // trends
+  {
+    const W0 = startOfWeek(T), W1 = addDays(W0, -7);
+    const tasks = dt(pd([
+      `- [x] A #работа [dur:: 1h] [spent:: 1h30m] 📅 ${W1} ✅ ${W1} 🆔 a`,
+      `- [x] B #работа [[Сайт]] [dur:: 30m] 📅 ${addDays(W1, 1)} ✅ ${addDays(W1, 1)} 🆔 b`,
+      `- [ ] C #дом [moved:: 2] 📅 ${addDays(W1, 2)} 🆔 c`,
+      `- [x] D [dur:: 2h] [spent:: 1h] 📅 ${W0} ✅ ${W0} 🆔 d`,
+      `- [ ] Old 📅 ${addDays(W0, -70)} 🆔 o`,
+    ].join("\n")));
+    const tr = computeTrends(tasks, T, 2);
+    eq("weeks: planned/done/moved", tr.weeks.map((w) => [w.planned, w.done, w.moved]), [[3, 2, 1], [1, 1, 0]]);
+    eq("weeks: minutes use tracked time first", tr.weeks.map((w) => w.minutes), [120, 60]);
+    eq("tags by time", tr.tags.map((b) => [b.name, b.minutes, b.weekly]), [["работа", 120, [120, 0]], ["без тега", 60, [0, 60]]]);
+    eq("projects", tr.projects.map((b) => [b.name, b.done]), [["Сайт", 1]]);
+    eq("estimate accuracy: median of 1.5 and 0.5", [tr.accuracy?.count, tr.accuracy?.ratio, tr.accuracy?.over], [2, 1, 0.5]);
+    eq("weekday totals", tr.weekdays.map((d) => d.done), [2, 1, 0, 0, 0, 0, 0]);
   }
   process.exit(fail ? 1 : 0);
 })();
