@@ -1,0 +1,3 @@
+#!/bin/sh
+# Typecheck and run the test suite before every commit.
+npm run --silent check >/dev/null 2>&1 || { echo "pre-commit: typecheck or tests failed — run 'npm run check' to see why" >&2; exit 1; }

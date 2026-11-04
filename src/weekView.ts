@@ -1,56 +1,42 @@
-import { ItemView, Menu, Notice, Platform, TFile, WorkspaceLeaf, setIcon } from "obsidian";
-import {
-  DAY_LONG, DAY_SHORT, DateStr, MONTH_NOM, addDays, addMonths, dayNum, diffDays, fmtMinutes, humanDay, parse, relativeLabel,
-  startOfWeek, today, weekDays, weekLabel, weekday,
-} from "./dates";
+import { ItemView, Notice, Platform, TFile, WorkspaceLeaf } from "obsidian";
+import { DateStr, addDays, addMonths, humanDay, startOfWeek, today } from "./dates";
 import { DragController, DropInfo } from "./drag";
-import { PRIORITY_LABEL, Priority, Task, compareInDay, displayTitle, projectOf, recurrenceLabel, taskNotes } from "./model";
+import { PRIORITY_LABEL, Priority, Task, compareInDay, displayTitle } from "./model";
 import { CalEvent } from "./ics";
 import { SavedFilter } from "./store";
 import { TaskModal } from "./modal";
-import { GoalsModal } from "./goalsModal";
-import { parseQuick } from "./quickadd";
 import type WeekPlannerPlugin from "./main";
-import { ICON, icon, iconText } from "./ui";
+import { BACKLOG, MOBILE_BREAKPOINT, HOUR_PX, STALE_AT, Mode, tagColor, toHHMM } from "./week/shared";
+import { updateFocusBadge } from "./week/card";
+import { renderTimeline, renderMobileTimeline, showTimeIndicator } from "./week/timeline";
+import { renderMonth } from "./week/month";
+import { renderMobile } from "./week/mobile";
+import { renderToolbar } from "./week/toolbar";
+import { applyCursor, cursorKey } from "./week/keyboard";
+import { renderDesktop, renderSelectionBar } from "./week/columns";
 
+export { STALE_AT, tagColor };
 export const VIEW_WEEK = "week-planner-view";
-const BACKLOG = "backlog";
-const MOBILE_BREAKPOINT = 720;
-const HOUR_PX = 56;
-const MIN_BLOCK_PX = 46; // a block always fits the title and one line of details
-export const STALE_AT = 5;
 
-type Mode = "week" | "month" | "timeline";
-
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
-export function tagColor(tag: string): number {
-  let h = 0;
-  for (const ch of tag) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return h % 8;
-}
-
-const toMin = (hhmm: string) => parseInt(hhmm.slice(0, 2)) * 60 + parseInt(hhmm.slice(3, 5));
-const toHHMM = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
-
+/** The week screen: holds view state and data helpers; rendering lives in ./week/*. */
 export class WeekView extends ItemView {
-  private weekStart: DateStr = startOfWeek(today());
-  private selected: DateStr = today(); // mobile: which day is shown
-  private mode: Mode = "week";
-  private filter: SavedFilter = { name: "", tag: null, minPriority: null, goal: null };
-  private selection = new Set<string>();
-  private cursor: string | null = null; // keyboard-selected task (desktop)
-  private flipTimer: number | null = null;
-  private flipEl: HTMLElement | null = null;
-  private selectMode = false;
-  private drag: DragController | null = null;
-  private compact = false;
-  private mobile = false;
-  private focusKey: string | null = null;
-  private resizeObs: ResizeObserver | null = null;
-  private timeIndicator: HTMLElement | null = null;
+  weekStart: DateStr = startOfWeek(today());
+  selected: DateStr = today(); // mobile: which day is shown
+  mode: Mode = "week";
+  filter: SavedFilter = { name: "", tag: null, minPriority: null, goal: null };
+  selection = new Set<string>();
+  cursor: string | null = null; // keyboard-selected task (desktop)
+  flipTimer: number | null = null;
+  flipEl: HTMLElement | null = null;
+  selectMode = false;
+  drag: DragController | null = null;
+  compact = false;
+  mobile = false;
+  focusKey: string | null = null;
+  resizeObs: ResizeObserver | null = null;
+  timeIndicator: HTMLElement | null = null;
 
-  constructor(leaf: WorkspaceLeaf, private plugin: WeekPlannerPlugin) {
+  constructor(leaf: WorkspaceLeaf, public plugin: WeekPlannerPlugin) {
     super(leaf);
   }
 
@@ -58,17 +44,17 @@ export class WeekView extends ItemView {
   getDisplayText() { return "Неделя"; }
   getIcon() { return "calendar-days"; }
 
-  private get store() { return this.plugin.store; }
-  private get settings() { return this.plugin.settings; }
+  get store() { return this.plugin.store; }
+  get settings() { return this.plugin.settings; }
 
   async onOpen() {
     this.contentEl.addClass("wp-root");
     this.registerEvent(this.store.on("changed", () => this.render()));
-    this.registerEvent(this.plugin.focus.on("tick", () => this.updateFocusBadge()));
+    this.registerEvent(this.plugin.focus.on("tick", () => updateFocusBadge(this)));
     this.drag = new DragController(this.contentEl, {
       onDrop: (id, target, before, info) => this.onDrop(id, target, before, info),
       onHover: (el, top) => {
-        this.showTimeIndicator(el, top);
+        showTimeIndicator(this, el, top);
         this.flipOnHover(el);
       },
       onSwipe: (id, dir) => {
@@ -118,12 +104,12 @@ export class WeekView extends ItemView {
     this.contentEl.querySelector<HTMLInputElement>(".wp-quick input")?.focus();
   }
 
-  private setMode(m: Mode) {
+  setMode(m: Mode) {
     this.mode = m;
     this.render();
   }
 
-  private shift(n: number) {
+  shift(n: number) {
     if (this.mode === "month") {
       const anchor = addMonths(this.monthAnchor(), n);
       this.weekStart = startOfWeek(anchor);
@@ -135,12 +121,12 @@ export class WeekView extends ItemView {
   }
 
   /** First day of the month the current week mostly belongs to. */
-  private monthAnchor(): DateStr {
+  monthAnchor(): DateStr {
     const mid = addDays(this.weekStart, 3);
     return mid.slice(0, 8) + "01";
   }
 
-  private onKey(e: KeyboardEvent) {
+  onKey(e: KeyboardEvent) {
     const typing = (e.target as HTMLElement).closest("input, textarea, select");
     if (typing) {
       if (e.key === "Escape") (e.target as HTMLElement).blur();
@@ -163,7 +149,7 @@ export class WeekView extends ItemView {
       return;
     }
     if (e.metaKey || e.ctrlKey || e.altKey && !e.key.startsWith("Arrow")) return;
-    if (!e.altKey && this.cursorKey(e)) return;
+    if (!e.altKey && cursorKey(this, e)) return;
     const k = e.key;
     if (k === "n" || k === "т") { e.preventDefault(); this.newTask(); }
     else if (k === "t" || k === "е") this.goToday();
@@ -179,70 +165,7 @@ export class WeekView extends ItemView {
 
   // ---------- keyboard cursor (desktop) ----------
 
-  /** Columns of task cards in screen order, for arrow-key movement. */
-  private cursorColumns(): HTMLElement[][] {
-    const lists = this.mode === "timeline"
-      ? [...this.contentEl.querySelectorAll<HTMLElement>(".wp-tl-headcol")].map((col, i) => [col.querySelector(".wp-tl-untimed"), this.contentEl.querySelectorAll(".wp-tl-day")[i]])
-      : [...this.contentEl.querySelectorAll<HTMLElement>(".wp-grid .wp-list")].map((l) => [l]);
-    return lists.map((parts) => parts.flatMap((p) => (p ? [...p.querySelectorAll<HTMLElement>(".wp-card[data-id]")] : [])));
-  }
-
-  private applyCursor() {
-    this.contentEl.querySelectorAll(".wp-card.is-cursor").forEach((c) => c.removeClass("is-cursor"));
-    if (!this.cursor) return;
-    const card = this.contentEl.querySelector<HTMLElement>(`.wp-card[data-id="${CSS.escape(this.cursor)}"]`);
-    if (!card) return;
-    card.addClass("is-cursor");
-    card.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }
-
-  /** ↑↓ / j k, ← →, x or space, Enter / e, 1–7, 0, Delete. Returns true when handled. */
-  private cursorKey(e: KeyboardEvent): boolean {
-    if (this.mobile || this.mode === "month") return false;
-    const k = e.key;
-    const cols = this.cursorColumns();
-    const pos = () => {
-      for (let c = 0; c < cols.length; c++) {
-        const r = cols[c].findIndex((el) => el.dataset.id === this.cursor);
-        if (r >= 0) return { c, r };
-      }
-      return null;
-    };
-    const set = (el: HTMLElement | undefined) => {
-      if (!el) return;
-      this.cursor = el.dataset.id!;
-      this.applyCursor();
-    };
-    const move = (dc: number, dr: number) => {
-      const p = pos();
-      if (!p) {
-        // Start on today's column if it has tasks, else the first task anywhere.
-        const todayIdx = this.mode === "timeline" ? weekday(today()) - 1 : weekday(today());
-        set(cols[todayIdx]?.[0] ?? cols.find((c) => c.length)?.[0]);
-        return;
-      }
-      if (dr) return set(cols[p.c][Math.max(0, Math.min(cols[p.c].length - 1, p.r + dr))]);
-      for (let c = p.c + dc; c >= 0 && c < cols.length; c += dc)
-        if (cols[c].length) return set(cols[c][Math.min(p.r, cols[c].length - 1)]);
-    };
-    const id = this.cursor && this.store.find(this.cursor) ? this.cursor : null;
-    if (k === "ArrowDown" || k === "j" || k === "о") move(0, 1);
-    else if (k === "ArrowUp" || k === "k" || k === "л") move(0, -1);
-    else if (k === "ArrowRight") move(1, 0);
-    else if (k === "ArrowLeft") move(-1, 0);
-    else if (!id) return false;
-    else if (k === "x" || k === "ч" || k === " ") this.store.toggle(id);
-    else if (k === "Enter" || k === "e" || k === "у") { const t = this.store.find(id); if (t) this.openTask(t); }
-    else if (/^[1-7]$/.test(k)) this.store.move(id, addDays(this.weekStart, parseInt(k) - 1), null);
-    else if (k === "0") this.store.move(id, null, null);
-    else if (k === "Delete" || k === "Backspace") this.store.remove(id);
-    else if (k === "Escape") { this.cursor = null; this.applyCursor(); }
-    else return false;
-    e.preventDefault();
-    return true;
-  }
-
-  private toggleDone() {
+  toggleDone() {
     this.settings.showDone = !this.settings.showDone;
     this.plugin.saveSettings();
     this.render();
@@ -250,7 +173,7 @@ export class WeekView extends ItemView {
 
   // ---------- data ----------
 
-  private matches(t: Task) {
+  matches(t: Task) {
     const f = this.filter;
     if (f.tag && !t.tags.includes(f.tag)) return false;
     if (f.minPriority != null && t.priority < f.minPriority) return false;
@@ -258,18 +181,18 @@ export class WeekView extends ItemView {
     return true;
   }
 
-  private visible(t: Task) {
+  visible(t: Task) {
     if (!this.matches(t)) return false;
     if (!this.settings.showDone && t.done) return false;
     return true;
   }
 
-  private filterActive() {
+  filterActive() {
     const f = this.filter;
     return !!(f.tag || f.minPriority != null || f.goal);
   }
 
-  private filterLabel() {
+  filterLabel() {
     const f = this.filter;
     if (f.name) return f.name;
     const parts: string[] = [];
@@ -279,60 +202,16 @@ export class WeekView extends ItemView {
     return parts.join(" · ");
   }
 
-  private setFilter(patch: Partial<SavedFilter>) {
+  setFilter(patch: Partial<SavedFilter>) {
     this.filter = { ...this.filter, name: "", ...patch };
     this.render();
   }
 
-  private filterMenu(e: MouseEvent) {
-    const m = new Menu();
-    const f = this.filter;
-    if (this.filterActive()) m.addItem((i) => i.setTitle("Сбросить фильтр").setIcon("x").onClick(() => this.setFilter({ tag: null, minPriority: null, goal: null })));
-    for (const sf of this.settings.savedFilters)
-      m.addItem((i) => i.setTitle(sf.name).setIcon("bookmark").setChecked(f.name === sf.name).onClick(() => { this.filter = { ...sf }; this.render(); }));
-    if (this.settings.savedFilters.length) m.addSeparator();
-    for (const t of this.store.allTags())
-      m.addItem((i) => i.setTitle("#" + t).setChecked(f.tag === t).onClick(() => this.setFilter({ tag: f.tag === t ? null : t })));
-    m.addSeparator();
-    for (const [p, label] of [[2, "Только высокий и срочный"], [1, "Средний и выше"]] as [number, string][])
-      m.addItem((i) => i.setTitle(label).setIcon("signal").setChecked(f.minPriority === p).onClick(() => this.setFilter({ minPriority: f.minPriority === p ? null : p })));
-    const goals = this.store.goalsFor(this.weekStart);
-    if (goals.length) {
-      m.addSeparator();
-      for (const g of goals) m.addItem((i) => i.setTitle(`Цель: ${g.title}`).setIcon("target").setChecked(f.goal === g.id).onClick(() => this.setFilter({ goal: f.goal === g.id ? null : g.id })));
-    }
-    if (this.filterActive() && !f.name) {
-      m.addSeparator();
-      m.addItem((i) => i.setTitle("Сохранить фильтр…").setIcon("bookmark-plus").onClick(() =>
-        this.plugin.promptText("Название фильтра", this.filterLabel(), async (name) => {
-          this.settings.savedFilters = [...this.settings.savedFilters.filter((x) => x.name !== name), { ...this.filter, name }];
-          await this.plugin.saveSettings();
-          this.filter = { ...this.filter, name };
-          this.render();
-        })));
-    }
-    if (f.name) m.addItem((i) => i.setTitle(`Удалить фильтр «${f.name}»`).setIcon("trash").onClick(async () => {
-      this.settings.savedFilters = this.settings.savedFilters.filter((x) => x.name !== f.name);
-      await this.plugin.saveSettings();
-      this.setFilter({ tag: null, minPriority: null, goal: null });
-    }));
-    m.showAtMouseEvent(e);
-  }
-
-  private filterButton(parent: HTMLElement, compact: boolean) {
-    const active = this.filterActive();
-    if (compact && !active) return;
-    const b = parent.createEl("button", { cls: `wp-chip-btn wp-filter-btn ${active ? "is-active" : ""}` });
-    icon(b, "filter");
-    b.createSpan({ text: active ? this.filterLabel() : "Фильтр" });
-    b.onclick = (e) => this.filterMenu(e);
-  }
-
-  private events(day: DateStr): CalEvent[] {
+  events(day: DateStr): CalEvent[] {
     return this.store.eventsOn(day);
   }
 
-  private tasksFor(day: DateStr | null): Task[] {
+  tasksFor(day: DateStr | null): Task[] {
     const all = this.store.all();
     const order = new Map(all.map((t, i) => [t.id, i]));
     return all
@@ -340,7 +219,7 @@ export class WeekView extends ItemView {
       .sort((a, b) => compareInDay(a, b, order.get(a.id)!, order.get(b.id)!));
   }
 
-  private dayStats(day: DateStr | null) {
+  dayStats(day: DateStr | null) {
     const list = this.store.all().filter((t) => this.store.effectiveDue(t) === day && this.matches(t));
     const done = list.filter((t) => t.done).length;
     const events = day ? this.events(day).reduce((s, e) => s + e.minutes, 0) : 0;
@@ -351,7 +230,7 @@ export class WeekView extends ItemView {
   // ---------- drop ----------
 
   /** Holding a dragged card over ‹ / › flips the week, so it can be dropped on a day there. */
-  private flipOnHover(el: HTMLElement | null) {
+  flipOnHover(el: HTMLElement | null) {
     const flip = el?.dataset.flip;
     if (el === this.flipEl) return;
     if (this.flipTimer) window.clearTimeout(this.flipTimer);
@@ -364,7 +243,7 @@ export class WeekView extends ItemView {
     }, 650);
   }
 
-  private onDrop(id: string, target: string, before: string | null, info: DropInfo) {
+  onDrop(id: string, target: string, before: string | null, info: DropInfo) {
     if (this.flipTimer) window.clearTimeout(this.flipTimer);
     this.flipTimer = null;
     this.flipEl = null;
@@ -398,18 +277,6 @@ export class WeekView extends ItemView {
     this.store.move(id, due, before);
   }
 
-  private showTimeIndicator(el: HTMLElement | null, top: number) {
-    this.timeIndicator?.remove();
-    this.timeIndicator = null;
-    if (!el?.hasAttribute("data-drop-time")) return;
-    const rect = el.getBoundingClientRect();
-    const steps = Math.round(((top - rect.top) / HOUR_PX) * 4);
-    const min = Math.max(this.settings.timelineStart * 60, Math.min(this.settings.timelineEnd * 60 - 15, this.settings.timelineStart * 60 + steps * 15));
-    const ind = el.createDiv({ cls: "wp-time-indicator", text: toHHMM(min) });
-    ind.style.top = `${((min - this.settings.timelineStart * 60) / 60) * HOUR_PX}px`;
-    this.timeIndicator = ind;
-  }
-
   // ---------- render ----------
 
   render() {
@@ -421,667 +288,59 @@ export class WeekView extends ItemView {
     root.toggleClass("is-mobile", this.mobile);
     root.toggleClass("is-compact", this.compact);
     root.dataset.mode = mode;
-    this.renderToolbar(root, mode);
-    if (mode === "month") this.renderMonth(root);
-    else if (this.mobile && mode === "timeline") this.renderMobileTimeline(root);
-    else if (this.mobile) this.renderMobile(root);
-    else if (mode === "timeline") this.renderTimeline(root);
-    else this.renderDesktop(root);
-    if (this.selectMode || this.selection.size) this.renderSelectionBar(root);
+    renderToolbar(this, root, mode);
+    if (mode === "month") renderMonth(this, root);
+    else if (this.mobile && mode === "timeline") renderMobileTimeline(this, root);
+    else if (this.mobile) renderMobile(this, root);
+    else if (mode === "timeline") renderTimeline(this, root);
+    else renderDesktop(this, root);
+    if (this.selectMode || this.selection.size) renderSelectionBar(this, root);
     this.restoreScroll(scroll);
-    if (this.cursor) this.applyCursor();
+    if (this.cursor) applyCursor(this);
     if (this.focusKey) {
       root.querySelector<HTMLInputElement>(`input[data-key="${this.focusKey}"]`)?.focus();
       this.focusKey = null;
     }
   }
 
-  private saveScroll() {
+  saveScroll() {
     const map = new Map<string, [number, number]>();
     this.contentEl.querySelectorAll<HTMLElement>("[data-scroll-key]").forEach((el) => map.set(el.dataset.scrollKey!, [el.scrollLeft, el.scrollTop]));
     return map;
   }
 
-  private restoreScroll(map: Map<string, [number, number]>) {
+  restoreScroll(map: Map<string, [number, number]>) {
     this.contentEl.querySelectorAll<HTMLElement>("[data-scroll-key]").forEach((el) => {
       const v = map.get(el.dataset.scrollKey!);
       if (v) [el.scrollLeft, el.scrollTop] = v;
     });
   }
 
-  /** ‹ / › — also a drop target: drop a task here to move it a week, hover to flip the week. */
-  private arrow(parent: HTMLElement, dir: 1 | -1, label: string, droppable: boolean) {
-    const b = this.iconBtn(parent, dir < 0 ? "chevron-left" : "chevron-right", label, () => this.shift(dir), "wp-arrow");
-    if (droppable) {
-      b.dataset.drop = dir < 0 ? "week-prev" : "week-next";
-      b.dataset.flip = String(dir);
-    }
-    return b;
-  }
-
-  private iconBtn(parent: HTMLElement, icon: string, label: string, fn: (e: MouseEvent) => void, cls = "") {
-    const b = parent.createEl("button", { cls: `wp-icon-btn clickable-icon ${cls}`, attr: { "aria-label": label } });
-    setIcon(b, icon);
-    b.onclick = fn;
-    return b;
-  }
-
-  private renderMobileToolbar(root: HTMLElement, mode: Mode) {
-    const bar = root.createDiv("wp-toolbar wp-m-toolbar");
-    const row1 = bar.createDiv("wp-m-row");
-    this.arrow(row1, -1, "Назад", mode !== "month");
-    row1.createEl("button", { text: "Сегодня", cls: "wp-today-btn" }).onclick = () => this.goToday();
-    this.arrow(row1, 1, "Вперёд", mode !== "month");
-    const title = row1.createDiv("wp-week-title");
-    if (mode === "month") {
-      const a = parse(this.monthAnchor());
-      title.setText(`${MONTH_NOM[a.getMonth()]} ${a.getFullYear()}`);
-    } else {
-      title.createSpan({ text: weekLabel(this.weekStart) });
-    }
-    const row2 = bar.createDiv("wp-m-row");
-    const seg = row2.createDiv("wp-segmented wp-mode");
-    for (const [m, label] of [["week", "Неделя"], ["month", "Месяц"], ["timeline", "Шкала"]] as [Mode, string][]) {
-      const b = seg.createEl("button", { text: label, cls: "wp-seg-btn" });
-      if (mode === m) b.addClass("is-active");
-      b.onclick = () => this.setMode(m);
-    }
-    this.filterButton(row2, true);
-    const icons = row2.createDiv("wp-toolbar-right");
-    if (mode !== "month") {
-      const g = icons.createEl("button", { cls: `wp-icon-btn clickable-icon ${this.filter.goal ? "is-running" : ""}`, attr: { "aria-label": "Цели недели" } });
-      setIcon(g, "target");
-      g.onclick = (e) => this.goalsMenu(e);
-    }
-    this.iconBtn(icons, "search", "Найти задачу", () => this.plugin.openPalette());
-    this.iconBtn(icons, "wand-2", "Спланировать неделю", () => this.plugin.openPlanning(this.weekStart));
-    this.iconBtn(icons, "timer", "Фокус", () => this.plugin.activateFocus(), this.plugin.focus.running ? "is-running" : "");
-    this.iconBtn(icons, "flame", "Привычки и статистика", () => this.plugin.activateHabits());
-    this.iconBtn(icons, "more-horizontal", "Ещё", (e) => this.moreMenu(e));
-  }
-
-  private moreMenu(e: MouseEvent) {
-    const m = new Menu();
-    const tags = this.store.allTags();
-    if (tags.length) {
-      m.addItem((i) => i.setTitle("Фильтр…").setIcon("filter").onClick(() => this.filterMenu(e)));
-    }
-    m.addItem((i) => i.setTitle(this.selectMode ? "Закончить выбор" : "Выбрать задачи").setIcon("check-square").onClick(() => {
-      this.selectMode = !this.selectMode;
-      if (!this.selectMode) this.selection.clear();
-      this.render();
-    }));
-    if (this.store.canUndo()) m.addItem((i) => i.setTitle("Отменить последнее действие").setIcon("undo-2").onClick(() => this.undo()));
-    m.addItem((i) => i.setTitle(this.settings.showDone ? "Скрыть выполненные" : "Показать выполненные").setIcon(this.settings.showDone ? "eye-off" : "eye").onClick(() => this.toggleDone()));
-    m.addItem((i) => i.setTitle("Шаблоны…").setIcon("layout-template").onClick(() => this.templatesMenu(e)));
-    if (!this.mobile && this.mode === "week")
-      m.addItem((i) => i.setTitle(this.compact ? "Обычный вид карточек" : "Компактный вид карточек").setIcon(this.compact ? "unfold-vertical" : "fold-vertical").onClick(() => { this.compact = !this.compact; this.render(); }));
-    m.addItem((i) => i.setTitle("Открыть файл задач").setIcon("file-text").onClick(() => this.openTasksFile()));
-    m.addItem((i) => i.setTitle("Журнал изменений").setIcon("history").onClick(() => this.plugin.openLog()));
-    if (this.mobile) m.addItem((i) => i.setTitle("Проекты").setIcon("folder-kanban").onClick(() => this.plugin.activateProjects()));
-    m.addItem((i) => i.setTitle("Разобрать бэклог").setIcon("inbox").onClick(() => this.plugin.openTriage()));
-    m.showAtMouseEvent(e);
-  }
-
-  private renderToolbar(root: HTMLElement, mode: Mode) {
-    if (this.mobile) return this.renderMobileToolbar(root, mode);
-    // Three zones: navigation on the left, view switch in the centre, actions on the right.
-    const bar = root.createDiv("wp-toolbar wp-toolbar-3");
-
-    const nav = bar.createDiv("wp-nav");
-    const month = mode === "month";
-    this.arrow(nav, -1, month ? "Прошлый месяц ([)" : "Прошлая неделя ([)", !month);
-    nav.createEl("button", { text: "Сегодня", cls: "wp-today-btn" }).onclick = () => this.goToday();
-    this.arrow(nav, 1, month ? "Следующий месяц (])" : "Следующая неделя (])", !month);
-    const title = nav.createDiv("wp-week-title");
-    if (month) {
-      const a = parse(this.monthAnchor());
-      title.setText(`${MONTH_NOM[a.getMonth()]} ${a.getFullYear()}`);
-    } else title.setText(weekLabel(this.weekStart));
-
-    const seg = bar.createDiv("wp-segmented wp-mode");
-    const modes: [Mode, string, string][] = [["week", "Неделя", "w"], ["month", "Месяц", "m"], ["timeline", "Шкала", "l"]];
-    for (const [m, label, key] of modes) {
-      const b = seg.createEl("button", { text: label, cls: "wp-seg-btn", attr: { "aria-label": `${label} (${key})` } });
-      if (mode === m) b.addClass("is-active");
-      b.onclick = () => this.setMode(m);
-    }
-
-    const right = bar.createDiv("wp-toolbar-right");
-    if (mode !== "month") this.goalsButton(right, false);
-    this.filterButton(right, false);
-    this.iconBtn(right, "search", "Найти задачу (⌘K)", () => this.plugin.openPalette());
-    this.iconBtn(right, "wand-2", "Спланировать неделю (p)", () => this.plugin.openPlanning(this.weekStart));
-    this.iconBtn(right, "timer", "Фокус: сегодня и помодоро (f)", () => this.plugin.activateFocus(), this.plugin.focus.running ? "is-running" : "");
-    this.iconBtn(right, "flame", "Привычки и статистика", () => this.plugin.activateHabits());
-    this.iconBtn(right, "folder-kanban", "Проекты", () => this.plugin.activateProjects());
-    this.iconBtn(right, "more-horizontal", "Ещё", (e) => this.moreMenu(e));
-    const add = right.createEl("button", { cls: "mod-cta wp-add-btn", attr: { "aria-label": "Новая задача (n)" } });
-    icon(add, "plus");
-    add.createSpan({ text: "Задача" });
-    add.onclick = () => this.newTask();
-  }
-
-  private newTask() {
+  newTask() {
     const day = this.selected !== BACKLOG && this.selected >= this.weekStart && this.selected <= addDays(this.weekStart, 6) ? this.selected : today();
     new TaskModal(this.app, this.plugin, null, day).open();
   }
 
   // ---------- goals dropdown ----------
 
-  private goalsButton(parent: HTMLElement, compact: boolean) {
-    const goals = this.store.goalsFor(this.weekStart);
-    const active = this.filter.goal ? this.store.findGoal(this.filter.goal) : null;
-    const b = parent.createEl("button", { cls: `wp-chip-btn wp-goals-btn ${active ? "is-active" : ""}`, attr: { "aria-label": "Цели недели" } });
-    icon(b, "target");
-    if (!compact || active) b.createSpan({ text: active ? active.title : goals.length ? `Цели · ${goals.filter((g) => g.done).length}/${goals.length}` : "Цели" });
-    icon(b, "chevron-down", "wp-chevron");
-    b.onclick = (e) => this.goalsMenu(e);
-  }
-
-  private goalsMenu(e: MouseEvent) {
-    const goals = this.store.goalsFor(this.weekStart);
-    const tasks = this.store.tasks();
-    const m = new Menu();
-    if (!goals.length) m.addItem((i) => i.setTitle("Целей на эту неделю нет").setDisabled(true));
-    for (const g of goals) {
-      const linked = tasks.filter((t) => t.goal === g.id);
-      const count = linked.length ? `  ${linked.filter((t) => t.done).length}/${linked.length}` : "";
-      m.addItem((i) => i.setTitle(g.title + count).setIcon(g.done ? "check-circle-2" : "circle").setChecked(this.filter.goal === g.id)
-        .onClick(() => this.setFilter({ goal: this.filter.goal === g.id ? null : g.id })));
-    }
-    if (this.filter.goal) m.addItem((i) => i.setTitle("Показать все задачи").setIcon("x").onClick(() => this.setFilter({ goal: null })));
-    m.addSeparator();
-    if (goals.length < 5) m.addItem((i) => i.setTitle("Добавить цель…").setIcon("plus").onClick(() =>
-      this.plugin.promptText("Цель недели", "", (v) => this.store.addGoal(this.weekStart, v))));
-    if (goals.length) m.addItem((i) => i.setTitle("Управлять целями…").setIcon("settings-2").onClick(() => new GoalsModal(this.app, this.plugin, this.weekStart).open()));
-    m.showAtMouseEvent(e);
-  }
-
-  private async templatesMenu(e: MouseEvent) {
-    const templates = await this.store.loadTemplates();
-    const m = new Menu();
-    if (!templates.length) m.addItem((i) => i.setTitle("Шаблонов пока нет").setDisabled(true));
-    for (const tpl of templates)
-      m.addItem((i) => i.setTitle(`Применить к неделе: ${tpl.name}`).setIcon("layout-template").onClick(async () => {
-        await this.store.applyTemplate(tpl, this.weekStart, null);
-        new Notice(`Шаблон «${tpl.name}»: добавлено задач ${tpl.tasks.length}`);
-      }));
-    m.addSeparator();
-    m.addItem((i) => i.setTitle("Сохранить эту неделю как шаблон").setIcon("save").onClick(() => {
-      const days = weekDays(this.weekStart);
-      const tasks = this.store.tasks().filter((t) => t.due && t.due >= days[0] && t.due <= days[6]);
-      this.plugin.promptText("Название шаблона недели", "Моя неделя", async (name) => {
-        await this.store.saveTemplate(name, tasks, true);
-        new Notice(`Шаблон «${name}» сохранён`);
-      });
-    }));
-    m.addItem((i) => i.setTitle("Редактировать шаблоны").setIcon("pencil").onClick(() => this.plugin.openFile(this.settings.templatesFile)));
-    m.showAtMouseEvent(e);
-  }
-
-  private async dayMenu(e: MouseEvent, day: DateStr) {
-    const templates = await this.store.loadTemplates();
-    const m = new Menu();
-    m.addItem((i) => i.setTitle("Заметка дня").setIcon("calendar-check").onClick(() => this.plugin.openDaily(day)));
-    m.addItem((i) => i.setTitle("Фокус на этом дне").setIcon("timer").onClick(() => this.plugin.activateFocus()));
-    m.addSeparator();
-    for (const tpl of templates)
-      m.addItem((i) => i.setTitle(`Шаблон: ${tpl.name}`).setIcon("layout-template").onClick(() => this.store.applyTemplate(tpl, this.weekStart, day)));
-    m.addItem((i) => i.setTitle("Сохранить день как шаблон").setIcon("save").onClick(() => {
-      const tasks = this.store.tasks().filter((t) => t.due === day);
-      this.plugin.promptText("Название шаблона дня", cap(DAY_LONG[weekday(day) - 1]), async (name) => {
-        await this.store.saveTemplate(name, tasks, false);
-        new Notice(`Шаблон «${name}» сохранён`);
-      });
-    }));
-    m.addSeparator();
-    const open = this.store.tasks().filter((t) => t.due === day && !t.done);
-    if (open.length)
-      m.addItem((i) => i.setTitle(`Перенести невыполненные (${open.length}) на следующий день`).setIcon("arrow-right").onClick(async () => {
-        for (const t of open) await this.store.move(t.id, addDays(day, 1), null);
-      }));
-    m.showAtMouseEvent(e);
-  }
-
-  private renderQuickAdd(parent: HTMLElement, day: DateStr | null, key: string, placeholder = "Быстро добавить: завтра 14:00 1ч #работа !! Созвон") {
-    const wrap = parent.createDiv("wp-quick");
-    const icon = wrap.createSpan("wp-quick-icon");
-    setIcon(icon, "plus");
-    const input = wrap.createEl("input", { attr: { type: "text", placeholder, "data-key": key, enterkeyhint: "done" } });
-    input.addEventListener("keydown", async (e) => {
-      if (e.key !== "Enter" || e.isComposing || !input.value.trim()) return;
-      e.preventDefault();
-      const q = parseQuick(input.value, day ?? today());
-      if (!q.task.title) return;
-      const due = q.due !== undefined ? q.due : day;
-      this.focusKey = key;
-      input.value = "";
-      await this.store.add(q.task, due);
-      if (due !== day) new Notice(`Добавлено: ${due ? humanDay(due) : "бэклог"}`);
-    });
-    return input;
-  }
-
   // ---------- week (desktop) ----------
-
-  private renderDesktop(root: HTMLElement) {
-    const grid = root.createDiv({ cls: "wp-grid wp-scroll-x", attr: { "data-scroll-key": "grid" } });
-    this.renderColumn(grid, null);
-    for (const d of weekDays(this.weekStart)) this.renderColumn(grid, d);
-  }
-
-  private colClasses(col: HTMLElement, day: DateStr | null) {
-    const now = today();
-    if (day === null) return col.addClass("is-backlog");
-    if (day === now) col.addClass("is-today");
-    if (day < now) col.addClass("is-past");
-    if (weekday(day) >= 6) col.addClass("is-weekend");
-  }
-
-  private renderColHead(col: HTMLElement, day: DateStr | null) {
-    const head = col.createDiv("wp-col-head");
-    const stats = this.dayStats(day);
-    const line1 = head.createDiv("wp-col-title");
-    if (day) {
-      const link = line1.createSpan({ cls: "wp-day-link", attr: { "aria-label": "Заметка дня" } });
-      link.createSpan({ cls: "wp-dow", text: DAY_SHORT[weekday(day) - 1] });
-      link.createSpan({ cls: "wp-daynum", text: String(dayNum(day)) });
-      link.onclick = () => this.plugin.openDaily(day);
-      const rel = relativeLabel(day);
-      if (rel) line1.createSpan({ cls: "wp-rel", text: rel });
-    } else {
-      line1.createSpan({ cls: "wp-dow", text: "Бэклог" });
-      if (stats.total - stats.done > 0) {
-        const tr = line1.createSpan({ cls: "wp-col-menu wp-triage-link clickable-icon", attr: { "aria-label": "Разобрать бэклог по одной задаче" } });
-        setIcon(tr, "list-checks");
-        tr.onclick = () => this.plugin.openTriage();
-      }
-    }
-    line1.createSpan({ cls: "wp-count", text: stats.total ? `${stats.done}/${stats.total}` : "" });
-    if (day) {
-      const more = line1.createSpan({ cls: "wp-col-menu clickable-icon", attr: { "aria-label": "Действия с днём" } });
-      setIcon(more, "more-horizontal");
-      more.onclick = (e) => this.dayMenu(e, day);
-      head.addEventListener("contextmenu", (e) => { e.preventDefault(); this.dayMenu(e, day); });
-      const load = head.createDiv("wp-load");
-      const cap = this.settings.dayCapacityHours * 60;
-      const ratio = cap ? stats.minutes / cap : 0;
-      if (ratio > 1) col.addClass("is-overloaded");
-      const bar = load.createDiv("wp-bar");
-      bar.createDiv({ cls: `wp-bar-fill ${ratio > 1 ? "is-over" : ratio > 0.8 ? "is-high" : ""}`, attr: { style: `width:${Math.min(100, ratio * 100)}%` } });
-      load.createSpan({
-        cls: "wp-muted", text: stats.minutes ? fmtMinutes(stats.minutes) + (ratio > 1 ? ` · +${fmtMinutes(stats.minutes - cap)}` : "") : "",
-        attr: ratio > 1 ? { "aria-label": `Перегруз: план больше ${this.settings.dayCapacityHours}ч` } : {},
-      });
-    }
-  }
-
-  private renderColumn(grid: HTMLElement, day: DateStr | null) {
-    const col = grid.createDiv("wp-col");
-    this.colClasses(col, day);
-    this.renderColHead(col, day);
-    const list = col.createDiv({ cls: "wp-list wp-scroll-y", attr: { "data-drop": day ?? BACKLOG, "data-drop-list": "", "data-scroll-key": day ?? BACKLOG } });
-    if (day) this.renderEvents(list, day);
-    for (const t of this.tasksFor(day)) this.renderCard(list, t);
-    list.createDiv("wp-list-end");
-    const foot = col.createDiv("wp-col-foot");
-    this.renderQuickAdd(foot, day, `col-${day ?? BACKLOG}`, "Добавить…");
-  }
 
   // ---------- timeline ----------
 
-  private renderTimeline(root: HTMLElement) {
-    const s = this.settings;
-    const days = weekDays(this.weekStart);
-    const wrap = root.createDiv("wp-tl");
-    const head = wrap.createDiv("wp-tl-row wp-tl-head");
-    head.createDiv("wp-tl-gutter");
-    for (const d of days) {
-      const col = head.createDiv("wp-col wp-tl-headcol");
-      this.colClasses(col, d);
-      this.renderColHead(col, d);
-      const untimed = col.createDiv({ cls: "wp-list wp-tl-untimed wp-scroll-y", attr: { "data-drop": d, "data-drop-list": "", "data-untimed": "", "data-scroll-key": `u-${d}` } });
-      for (const t of this.tasksFor(d).filter((t) => !t.time)) this.renderCard(untimed, t);
-      untimed.createDiv("wp-list-end");
-    }
-    const scroller = wrap.createDiv({ cls: "wp-tl-scroll wp-scroll-y", attr: { "data-scroll-key": "timeline" } });
-    const body = scroller.createDiv("wp-tl-row wp-tl-body");
-    const hours = s.timelineEnd - s.timelineStart;
-    const gutter = body.createDiv("wp-tl-gutter");
-    gutter.style.height = `${hours * HOUR_PX}px`;
-    for (let h = 0; h < hours; h++) gutter.createDiv({ cls: "wp-tl-hour", text: `${String(s.timelineStart + h).padStart(2, "0")}:00` }).style.top = `${h * HOUR_PX}px`;
-    const now = new Date();
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    for (const d of days) this.renderTimelineDay(body, d, nowMin);
-    // Start scrolled to the morning on first open.
-    if (!scroller.dataset.inited) requestAnimationFrame(() => {
-      if (scroller.scrollTop === 0) scroller.scrollTop = Math.max(0, (Math.max(8, now.getHours() - 1) - s.timelineStart) * HOUR_PX);
-    });
-  }
-
-  private renderTimelineDay(body: HTMLElement, d: DateStr, nowMin: number) {
-    const s = this.settings;
-    const hours = s.timelineEnd - s.timelineStart;
-    const col = body.createDiv({ cls: "wp-tl-day", attr: { "data-drop": d, "data-drop-time": "" } });
-    this.colClasses(col, d);
-    col.style.height = `${hours * HOUR_PX}px`;
-    for (let h = 0; h < hours; h++) col.createDiv("wp-tl-line").style.top = `${h * HOUR_PX}px`;
-    if (d === today() && nowMin >= s.timelineStart * 60 && nowMin < s.timelineEnd * 60)
-      col.createDiv("wp-tl-now").style.top = `${((nowMin - s.timelineStart * 60) / 60) * HOUR_PX}px`;
-    for (const ev of this.events(d)) {
-      if (!ev.start) continue;
-      const startMin = toMin(ev.start);
-      const block = col.createDiv({ cls: `wp-event wp-tl-event cal-${ev.calendar % 4}`, attr: { "aria-label": `${ev.start} ${ev.title}` } });
-      block.style.top = `${((startMin - s.timelineStart * 60) / 60) * HOUR_PX}px`;
-      block.style.height = `${(Math.max(ev.minutes, 20) / 60) * HOUR_PX - 2}px`;
-      block.createSpan({ cls: "wp-event-time", text: ev.start });
-      block.createSpan({ text: " " + ev.title });
-    }
-    // Lay overlapping blocks side by side.
-    const items = this.tasksFor(d).filter((t) => t.time)
-      .map((t) => ({ t, start: toMin(t.time!), end: toMin(t.time!) + Math.max(t.duration || 30, Math.ceil((MIN_BLOCK_PX / HOUR_PX) * 60)), lane: 0, lanes: 1 }));
-    items.sort((a, b) => a.start - b.start);
-    let cluster: typeof items = [];
-    let clusterEnd = -1;
-    const flush = () => {
-      const laneEnds: number[] = [];
-      for (const it of cluster) {
-        let lane = laneEnds.findIndex((e) => e <= it.start);
-        if (lane < 0) lane = laneEnds.length;
-        laneEnds[lane] = it.end;
-        it.lane = lane;
-      }
-      for (const it of cluster) it.lanes = laneEnds.length;
-      cluster = [];
-    };
-    for (const it of items) {
-      if (it.start >= clusterEnd && cluster.length) flush();
-      cluster.push(it);
-      clusterEnd = Math.max(clusterEnd, it.end);
-    }
-    flush();
-    for (const it of items) {
-      const card = this.renderCard(col, it.t);
-      card.addClass("wp-tl-block");
-      card.style.top = `${((it.start - s.timelineStart * 60) / 60) * HOUR_PX}px`;
-      card.style.height = `${((it.end - it.start) / 60) * HOUR_PX - 2}px`;
-      card.style.left = `calc(${(it.lane / it.lanes) * 100}% + 2px)`;
-      card.style.width = `calc(${100 / it.lanes}% - 4px)`;
-    }
-  }
-
-  /** Phone: day strip, then the selected day's untimed tasks and an hour grid. */
-  private renderMobileTimeline(root: HTMLElement) {
-    const s = this.settings;
-    if (this.selected === BACKLOG) this.selected = today() >= this.weekStart && today() <= addDays(this.weekStart, 6) ? today() : this.weekStart;
-    const day = this.selected;
-    this.renderStrip(root, false);
-    const head = root.createDiv("wp-m-head");
-    const rel = relativeLabel(day);
-    head.createDiv({ cls: "wp-m-title", text: rel ? `${rel}, ${humanDay(day)}` : `${cap(DAY_LONG[weekday(day) - 1])}, ${humanDay(day)}` });
-    const untimed = root.createDiv({ cls: "wp-list wp-m-untimed", attr: { "data-drop": day, "data-drop-list": "", "data-untimed": "" } });
-    const loose = this.tasksFor(day).filter((t) => !t.time);
-    for (const t of loose) this.renderCard(untimed, t, true);
-    if (!loose.length) untimed.createDiv({ cls: "wp-muted wp-m-untimed-empty", text: "Задачи без времени — сюда. Удерживай задачу и тяни на нужный час." });
-    untimed.createDiv("wp-list-end");
-    const scroller = root.createDiv({ cls: "wp-tl-scroll wp-scroll-y wp-m-tl", attr: { "data-scroll-key": "m-timeline" } });
-    const body = scroller.createDiv("wp-tl-row wp-tl-body wp-m-tl-body");
-    const hours = s.timelineEnd - s.timelineStart;
-    const gutter = body.createDiv("wp-tl-gutter");
-    gutter.style.height = `${hours * HOUR_PX}px`;
-    for (let h = 0; h < hours; h++) gutter.createDiv({ cls: "wp-tl-hour", text: `${String(s.timelineStart + h).padStart(2, "0")}:00` }).style.top = `${h * HOUR_PX}px`;
-    const now = new Date();
-    this.renderTimelineDay(body, day, now.getHours() * 60 + now.getMinutes());
-    requestAnimationFrame(() => {
-      if (scroller.scrollTop === 0) scroller.scrollTop = Math.max(0, (Math.max(8, now.getHours() - 1) - s.timelineStart) * HOUR_PX);
-    });
-  }
-
   // ---------- month ----------
-
-  private renderMonth(root: HTMLElement) {
-    const anchor = this.monthAnchor();
-    const month = anchor.slice(0, 7);
-    const start = startOfWeek(anchor);
-    const now = today();
-    const wrap = root.createDiv("wp-month-wrap");
-    if (!this.mobile) {
-      const back = wrap.createDiv("wp-col is-backlog wp-month-backlog");
-      this.renderColHead(back, null);
-      const list = back.createDiv({ cls: "wp-list wp-scroll-y", attr: { "data-drop": BACKLOG, "data-drop-list": "", "data-scroll-key": "m-backlog" } });
-      for (const t of this.tasksFor(null)) this.renderCard(list, t);
-      list.createDiv("wp-list-end");
-    }
-    const grid = wrap.createDiv("wp-month");
-    for (const d of DAY_SHORT) grid.createDiv({ cls: "wp-month-dow", text: d });
-    let weeks = 0;
-    for (let w = start; w.slice(0, 7) <= month || weeks < 5; w = addDays(w, 7)) {
-      if (weeks >= 6) break;
-      weeks++;
-      for (const d of weekDays(w)) {
-        const cell = grid.createDiv({ cls: "wp-month-cell", attr: { "data-drop": d, "data-drop-list": "" } });
-        if (d.slice(0, 7) !== month) cell.addClass("is-other");
-        if (d === now) cell.addClass("is-today");
-        if (d < now) cell.addClass("is-past");
-        const top = cell.createDiv("wp-month-top");
-        const num = top.createSpan({ cls: "wp-month-num", text: String(dayNum(d)), attr: { "aria-label": "Открыть неделю" } });
-        num.onclick = () => this.showWeekOf(d);
-        const st = this.dayStats(d);
-        if (st.total) top.createSpan({ cls: "wp-count", text: `${st.done}/${st.total}` });
-        const tasks = this.tasksFor(d);
-        if (this.mobile) {
-          if (d === this.selected) cell.addClass("is-selected");
-          const dots = cell.createDiv("wp-month-dots");
-          for (const t of tasks.slice(0, 5)) dots.createDiv({ cls: `wp-dot prio-${t.priority} ${t.done ? "is-done" : ""}` });
-          cell.onclick = () => {
-            this.selected = d;
-            this.render();
-          };
-        } else {
-          for (const t of tasks) this.renderCard(cell, t, true);
-          cell.createDiv("wp-list-end");
-        }
-      }
-    }
-    grid.style.gridTemplateRows = this.mobile ? "" : `auto repeat(${weeks}, 1fr)`;
-    if (this.mobile) {
-      // Below the grid: the tapped day (defaults to today).
-      if (this.selected === BACKLOG || this.selected.slice(0, 7) !== month) this.selected = now.slice(0, 7) === month ? now : anchor;
-      this.renderDayList(root, this.selected);
-    }
-  }
 
   // ---------- calendar events ----------
 
-  private renderEvents(parent: HTMLElement, day: DateStr) {
-    for (const ev of this.events(day)) {
-      const row = parent.createDiv({ cls: `wp-event cal-${ev.calendar % 4}`, attr: { "aria-label": "Событие календаря" } });
-      if (ev.start) row.createSpan({ cls: "wp-event-time", text: ev.start });
-      else icon(row, "calendar");
-      row.createSpan({ cls: "wp-event-title", text: ev.title });
-      if (ev.minutes) row.createSpan({ cls: "wp-muted", text: fmtMinutes(ev.minutes) });
-    }
-  }
-
   // ---------- multi-select & undo ----------
 
-  private async undo() {
+  async undo() {
     const label = await this.store.undo();
     new Notice(label ? `Отменено: ${label.toLowerCase()}` : "Нечего отменять");
   }
 
-  private renderSelectionBar(root: HTMLElement) {
-    const bar = root.createDiv("wp-selbar");
-    const ids = [...this.selection];
-    bar.createSpan({ cls: "wp-selbar-count", text: ids.length ? `Выбрано: ${ids.length}` : "Нажимай на задачи" });
-    const act = (ic: string, label: string, fn: () => unknown) => {
-      const b = bar.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": label } });
-      setIcon(b, ic);
-      b.disabled = !ids.length;
-      b.onclick = async () => {
-        await fn();
-        this.selection.clear();
-        this.selectMode = false;
-        this.render();
-      };
-    };
-    const now = today();
-    act("check", "Выполнено", () => this.store.bulk(ids, "done"));
-    act("sun", "На сегодня", () => this.store.bulk(ids, { due: now }));
-    act("sunrise", "На завтра", () => this.store.bulk(ids, { due: addDays(now, 1) }));
-    act("calendar-plus", "На следующую неделю", () => this.store.bulk(ids, { due: addDays(startOfWeek(now), 7) }));
-    act("inbox", "В бэклог", () => this.store.bulk(ids, { due: null }));
-    act("trash-2", "Удалить", () => this.store.bulk(ids, "remove"));
-    const close = bar.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": "Отмена" } });
-    setIcon(close, "x");
-    close.onclick = () => {
-      this.selection.clear();
-      this.selectMode = false;
-      this.render();
-    };
-  }
-
   // ---------- cards ----------
 
-  private renderCard(parent: HTMLElement, t: Task, mini = false): HTMLElement {
-    const card = parent.createDiv({ cls: `wp-card prio-${t.priority}`, attr: { "data-id": t.id } });
-    if (mini) card.addClass("is-mini");
-    if (t.done) card.addClass("is-done");
-    if (t.source) card.addClass("is-external");
-    const stale = !t.done && t.moved >= STALE_AT;
-    if (t.moved >= 3 && !t.done) card.addClass("is-stale");
-    if (this.plugin.focus.taskId === t.id) card.addClass("is-focus");
-    if (this.selection.has(t.id)) card.addClass("is-selected");
-    const overdue = !!t.source && !t.done && t.due! < today();
-    const row = card.createDiv("wp-card-row");
-    const cb = row.createEl("input", { attr: { type: "checkbox", "aria-label": "Выполнено" }, cls: "task-list-item-checkbox wp-check" });
-    cb.checked = t.done;
-    cb.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.store.toggle(t.id);
-    });
-    const body = row.createDiv("wp-card-body");
-    const title = body.createDiv({ cls: "wp-card-title", text: displayTitle(t) });
-    if (stale) {
-      const warn = title.createSpan({ cls: "wp-stale-icon", attr: { "aria-label": `Переносилась ${t.moved} раз — пора решить, что с ней делать` } });
-      setIcon(warn, "alert-triangle");
-    }
-    if (!mini) {
-      const meta = body.createDiv("wp-card-meta");
-      if (t.time) meta.createSpan({ cls: "wp-meta wp-time", text: t.time });
-      if (t.duration) meta.createSpan({ cls: "wp-meta", text: fmtMinutes(t.duration) });
-      if (t.spent) iconText(meta, ICON.spent, fmtMinutes(t.spent), "wp-meta wp-spent", "Потрачено в фокусе");
-      if (t.recurrence) setIcon(meta.createSpan({ cls: "wp-meta wp-icon-meta", attr: { "aria-label": recurrenceLabel(t.recurrence) } }), "repeat");
-      if (t.moved) iconText(meta, ICON.moved, String(t.moved), "wp-meta wp-moved", `Переносилась ${t.moved} раз(а)`);
-      if (overdue) meta.createSpan({ cls: "wp-meta wp-overdue", text: `с ${humanDay(t.due!)}` });
-      if (t.deadline && !t.done) {
-        const left = diffDays(t.deadline, today());
-        const cls = left < 0 ? "is-overdue" : left <= 2 ? "is-soon" : "";
-        iconText(meta, "flag", left === 0 ? "сегодня" : left === 1 ? "до завтра" : `до ${humanDay(t.deadline)}`, `wp-meta wp-deadline ${cls}`,
-          left < 0 ? `Дедлайн прошёл ${humanDay(t.deadline)}` : `Дедлайн: ${humanDay(t.deadline)}`);
-      }
-      const nm = this.store.metaFor(t);
-      if (nm?.description || taskNotes(t)) icon(meta.createSpan({ cls: "wp-meta", attr: { "aria-label": "Есть описание" } }), "align-left");
-      if (nm?.links) iconText(meta, "link", String(nm.links), "wp-meta", "Ссылки");
-      if (nm?.files) iconText(meta, "paperclip", String(nm.files), "wp-meta", "Файлы");
-      if (nm?.comments) iconText(meta, "message-circle", String(nm.comments), "wp-meta", "Комментарии");
-      if (t.goal) {
-        const g = this.store.findGoal(t.goal);
-        if (g) iconText(meta, "target", g.title, "wp-meta wp-goal-badge", "Цель недели");
-      }
-      if (t.subtasks.length) {
-        const done = t.subtasks.filter((s) => s.done).length;
-        const s = meta.createSpan({ cls: "wp-meta wp-icon-meta" });
-        setIcon(s, "list-checks");
-        s.createSpan({ text: `${done}/${t.subtasks.length}` });
-      }
-      const project = projectOf(t);
-      if (project) {
-        const p = meta.createSpan({ cls: "wp-project", attr: { "aria-label": "Открыть проект" } });
-        setIcon(p.createSpan(), "folder");
-        p.createSpan({ text: project });
-        p.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.app.workspace.openLinkText(project, t.source?.path ?? this.settings.tasksFile, "tab");
-        });
-      }
-      if (t.source) {
-        const src = meta.createSpan({ cls: "wp-meta wp-icon-meta wp-source", attr: { "aria-label": `Из заметки: ${t.source.path}` } });
-        setIcon(src, "file-symlink");
-        src.createSpan({ text: t.source.path.split("/").pop()!.replace(/\.md$/, "") });
-      }
-      for (const tag of t.tags) {
-        const chip = meta.createSpan({ cls: `wp-tag tag-c${tagColor(tag)}`, text: "#" + tag });
-        chip.addEventListener("click", (e) => {
-          e.stopPropagation();
-          this.setFilter({ tag: this.filter.tag === tag ? null : tag });
-        });
-      }
-      if (!meta.childElementCount) meta.remove();
-    }
-
-    card.addEventListener("click", (e) => {
-      if (this.selectMode || this.selection.size || e.shiftKey || e.metaKey || e.ctrlKey) {
-        if (t.archivePath) return;
-        if (this.selection.has(t.id)) this.selection.delete(t.id);
-        else this.selection.add(t.id);
-        this.render();
-        return;
-      }
-      this.openTask(t);
-    });
-    card.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      this.cardMenu(t).showAtMouseEvent(e);
-    });
-    return card;
-  }
-
-  private openTask(t: Task) {
-    if (t.source) this.plugin.openSource(t);
-    else new TaskModal(this.app, this.plugin, t, t.due).open();
-  }
-
-  private updateFocusBadge() {
-    const btn = this.contentEl.querySelector(".wp-toolbar .wp-icon-btn[aria-label^='Фокус']");
-    btn?.toggleClass("is-running", this.plugin.focus.running);
-  }
-
-  cardMenu(t: Task) {
-    const m = new Menu();
-    const now = today();
-    const moveTo = (title: string, icon: string, due: DateStr | null) =>
-      m.addItem((i) => i.setTitle(title).setIcon(icon).onClick(() => this.store.move(t.id, due, null)));
-    m.addItem((i) => i.setTitle(t.done ? "Вернуть в работу" : "Выполнено").setIcon("check").onClick(() => this.store.toggle(t.id)));
-    if (!t.done && !t.source) m.addItem((i) => i.setTitle("Фокус на задаче").setIcon("timer").onClick(() => this.plugin.activateFocus(t.id)));
-    m.addSeparator();
-    moveTo("На сегодня", "sun", now);
-    moveTo("На завтра", "sunrise", addDays(now, 1));
-    moveTo("На следующую неделю", "calendar-plus", addDays(startOfWeek(now), 7));
-    moveTo("В бэклог", "inbox", null);
-    if (t.source) {
-      m.addSeparator();
-      m.addItem((i) => i.setTitle("Открыть заметку").setIcon("file-symlink").onClick(() => this.plugin.openSource(t)));
-      return m;
-    }
-    m.addSeparator();
-    const prios: Priority[] = [3, 2, 1, 0, -1];
-    for (const p of prios)
-      m.addItem((i) => i.setTitle(`Приоритет: ${PRIORITY_LABEL[p]}`).setChecked(t.priority === p).onClick(() => this.store.update(t.id, { priority: p })));
-    m.addSeparator();
-    if (t.moved) m.addItem((i) => i.setTitle("Сбросить счётчик переносов").setIcon("rotate-ccw").onClick(() => this.store.update(t.id, { moved: 0 })));
-    m.addItem((i) => i.setTitle("Дублировать").setIcon("copy").onClick(() => {
-      const { id, ...rest } = t;
-      void id;
-      this.store.add({ ...rest, done: false, doneDate: null, moved: 0, spent: 0 }, t.due);
-    }));
-    m.addItem((i) => i.setTitle("Открыть в файле").setIcon("file-text").onClick(() => this.openTasksFile(t)));
-    m.addItem((i) => i.setTitle("Удалить").setIcon("trash").setWarning(true).onClick(() => this.store.remove(t.id)));
-    return m;
-  }
-
-  private async openTasksFile(t?: Task) {
+  async openTasksFile(t?: Task) {
     const file = this.app.vault.getAbstractFileByPath(this.settings.tasksFile);
     if (!(file instanceof TFile)) return;
     const leaf = this.app.workspace.getLeaf("tab");
@@ -1095,83 +354,4 @@ export class WeekView extends ItemView {
 
   // ---------- mobile ----------
 
-  private renderMobile(root: HTMLElement) {
-    this.renderStrip(root, true);
-    this.renderDayList(root, this.selected === BACKLOG ? null : this.selected);
-  }
-
-  private renderStrip(root: HTMLElement, withBacklog: boolean) {
-    const strip = root.createDiv("wp-strip");
-    if (!withBacklog) strip.addClass("is-7");
-    const now = today();
-    const mk = (key: string, label: string, date: DateStr | null) => {
-      const pill = strip.createDiv({ cls: "wp-pill", attr: { "data-drop": key } });
-      if ((date ?? BACKLOG) === this.selected) pill.addClass("is-selected");
-      if (date === now) pill.addClass("is-today");
-      if (date && date < now) pill.addClass("is-past");
-      pill.createDiv({ cls: "wp-pill-label", text: label });
-      const num = pill.createDiv("wp-pill-num");
-      if (date) num.setText(String(dayNum(date)));
-      else icon(num, ICON.backlog);
-      const st = this.dayStats(date);
-      const open = st.total - st.done;
-      const dot = pill.createDiv("wp-pill-count");
-      if (st.total && !open) {
-        icon(dot, ICON.done);
-        dot.addClass("is-clear");
-      } else if (open) dot.setText(String(open));
-      pill.onclick = () => {
-        this.selected = date ?? BACKLOG;
-        this.render();
-      };
-    };
-    for (const d of weekDays(this.weekStart)) mk(d, DAY_SHORT[weekday(d) - 1], d);
-    if (withBacklog) mk(BACKLOG, "Бэкл", null);
-  }
-
-  /** Mobile: the selected day's header, quick add and task list. */
-  private renderDayList(root: HTMLElement, day: DateStr | null) {
-    const now = today();
-    const head = root.createDiv("wp-m-head");
-    const st = this.dayStats(day);
-    if (day) {
-      const rel = relativeLabel(day);
-      const t = head.createDiv({ cls: "wp-m-title", text: rel ? `${rel}, ${humanDay(day)}` : `${cap(DAY_LONG[weekday(day) - 1])}, ${humanDay(day)}` });
-      t.onclick = () => this.plugin.openDaily(day);
-    } else {
-      head.createDiv({ cls: "wp-m-title", text: "Бэклог" });
-    }
-    const right = head.createDiv("wp-m-head-right");
-    right.createSpan({ cls: "wp-muted", text: [st.total ? `${st.done}/${st.total}` : "", st.minutes ? fmtMinutes(st.minutes) : ""].filter(Boolean).join(" · ") });
-    if (day) this.iconBtn(right, "more-horizontal", "Действия с днём", (e) => this.dayMenu(e, day));
-    else if (st.total - st.done > 0) {
-      const tr = right.createEl("button", { cls: "wp-chip-btn", text: "Разобрать" });
-      tr.onclick = () => this.plugin.openTriage();
-    }
-
-    const list = root.createDiv({ cls: "wp-list wp-m-list wp-scroll-y", attr: { "data-drop": day ?? BACKLOG, "data-drop-list": "", "data-scroll-key": `mobile-${this.mode}` } });
-    if (day) this.renderEvents(list, day);
-    const tasks = this.tasksFor(day);
-    for (const t of tasks) this.renderCard(list, t);
-    if (!tasks.length) list.createDiv({ cls: "wp-empty", text: day === now ? "На сегодня всё чисто" : "Нет задач" });
-    list.createDiv("wp-list-end");
-    // The "+" lives in Obsidian's bottom bar now; the floating one is only a fallback
-    // for when that button is turned off or Obsidian's bar changed and it couldn't be added.
-    if (!(this.settings.navbarButton && document.querySelector(".wp-navbar-add"))) this.renderFab(root, day);
-    this.maybeShowHint();
-  }
-
-  /** Floating "+" above Obsidian's bottom bar (phone). */
-  private renderFab(root: HTMLElement, day: DateStr | null) {
-    const fab = root.createEl("button", { cls: "wp-fab", attr: { "aria-label": "Новая задача" } });
-    setIcon(fab, "plus");
-    fab.onclick = () => new TaskModal(this.app, this.plugin, null, day).open();
-  }
-
-  private maybeShowHint() {
-    if (this.settings.mobileHintShown) return;
-    this.settings.mobileHintShown = true;
-    this.plugin.saveSettings();
-    new Notice("Удерживай задачу и перетащи на день в верхней полосе.\nСвайп вправо — на завтра, влево — выполнено.", 12_000);
-  }
 }

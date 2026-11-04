@@ -1,7 +1,7 @@
 {
   "id": "week-planner",
   "name": "Week Planner",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "minAppVersion": "1.5.0",
   "description": "Недельный планер: задачи по дням с перетаскиванием, перенос невыполненного, повторы, привычки и статистика.",
   "author": "Volkov",
