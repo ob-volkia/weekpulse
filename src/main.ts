@@ -3,6 +3,8 @@ import { DateStr, addDays, startOfWeek, today, weekday } from "./dates";
 import { dailyTemplate, registerDailyBlocks } from "./daily";
 import { FocusTimer, FocusView, VIEW_FOCUS, fmtClock } from "./focus";
 import { HabitsView, VIEW_HABITS } from "./habitsView";
+import { ProjectsView, VIEW_PROJECTS } from "./projectsView";
+import { TriageModal } from "./triage";
 import { injectNavbarButton, removeNavbarButton } from "./navbar";
 import { Task, displayTitle } from "./model";
 import { TaskModal } from "./modal";
@@ -32,6 +34,7 @@ export default class WeekPlannerPlugin extends Plugin {
     this.registerView(VIEW_WEEK, (leaf) => new WeekView(leaf, this));
     this.registerView(VIEW_HABITS, (leaf) => new HabitsView(leaf, this));
     this.registerView(VIEW_FOCUS, (leaf) => new FocusView(leaf, this));
+    this.registerView(VIEW_PROJECTS, (leaf) => new ProjectsView(leaf, this));
     registerDailyBlocks(this);
 
     this.addRibbonIcon("calendar-days", "Недельный планер", () => this.activateWeek());
@@ -42,6 +45,8 @@ export default class WeekPlannerPlugin extends Plugin {
       this.addCommand({ id, name, callback, hotkeys });
     cmd("open-week", "Открыть неделю", () => this.activateWeek());
     cmd("open-habits", "Открыть привычки и статистику", () => this.activateHabits());
+    cmd("open-projects", "Открыть проекты", () => this.activateProjects());
+    cmd("triage-backlog", "Разобрать бэклог", () => this.openTriage());
     cmd("open-focus", "Открыть фокус (сегодня + помодоро)", () => this.activateFocus());
     cmd("add-task", "Новая задача", () => new TaskModal(this.app, this, null, today()).open(), [{ modifiers: ["Mod", "Shift"], key: "a" }]);
     cmd("find-task", "Найти задачу", () => this.openPalette(), [{ modifiers: ["Mod", "Shift"], key: "k" }]);
@@ -353,6 +358,14 @@ export default class WeekPlannerPlugin extends Plugin {
 
   activateHabits() {
     return this.activate(VIEW_HABITS);
+  }
+
+  activateProjects() {
+    return this.activate(VIEW_PROJECTS);
+  }
+
+  openTriage() {
+    new TriageModal(this.app, this).open();
   }
 
   async activateFocus(taskId?: string) {

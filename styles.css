@@ -733,3 +733,52 @@ button.wp-danger { color: var(--color-red); }
 .wp-log-body { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wp-log-action { font-weight: 600; }
 .wp-log-device { color: var(--text-faint); font-size: var(--font-ui-smaller); flex: none; }
+
+/* ======================= v3.0: block 3 ======================= */
+.wp-card.is-cursor { box-shadow: 0 0 0 2px var(--interactive-accent); }
+.wp-root button.wp-arrow.is-drop-target { background: color-mix(in srgb, var(--interactive-accent) 30%, transparent); color: var(--text-normal); transform: scale(1.15); }
+.wp-strip.is-7 { grid-template-columns: repeat(7, 1fr); }
+/* phone timeline */
+.wp-root.is-mobile .wp-m-untimed { flex: none; max-height: 24vh; overflow-y: auto; gap: 4px; padding: 2px 0; }
+.wp-m-untimed-empty { font-size: var(--font-ui-smaller); padding: 4px 2px; }
+.wp-root.is-mobile .wp-m-tl { flex: 1; min-height: 0; border-top: none; padding-bottom: var(--wp-bottom-safe); }
+.wp-tl-row.wp-m-tl-body { grid-template-columns: 44px minmax(0, 1fr); }
+.wp-root.is-mobile .wp-card.wp-tl-block { padding: 3px 6px; border-radius: 6px; }
+.wp-root.is-mobile .wp-card.wp-tl-block .wp-card-title { font-size: var(--font-ui-small); }
+/* projects */
+.wp-projects-root { overflow-y: auto; }
+.wp-projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; padding-bottom: var(--wp-bottom-safe); }
+.wp-project-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 10px; background: var(--background-secondary); border: 1px solid var(--background-modifier-border); }
+.wp-project-card.is-finished { opacity: .6; }
+.wp-project-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wp-project-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: var(--font-ui-medium); cursor: pointer; min-width: 0; }
+.wp-project-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-project-name:hover { color: var(--text-accent); }
+.wp-project-name .wp-ico svg { width: 15px; height: 15px; color: var(--text-accent); }
+.wp-project-meta { font-size: var(--font-ui-smaller); color: var(--text-muted); }
+.wp-project-meta.has-overdue { color: var(--color-red); }
+.wp-project-tasks { display: flex; flex-direction: column; gap: 2px; }
+.wp-project-task { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; border-left: 3px solid transparent; }
+.wp-project-task:hover { background: var(--background-modifier-hover); }
+.wp-project-task.prio-3 { border-left-color: var(--color-red); } .wp-project-task.prio-2 { border-left-color: var(--color-orange); } .wp-project-task.prio-1 { border-left-color: var(--color-yellow); }
+.wp-project-task input { margin: 0; }
+.wp-project-task-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-project-when { flex: none; font-size: var(--font-ui-smaller); }
+.wp-project-when.is-overdue { color: var(--color-red); }
+.wp-root button.wp-project-add { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; }
+/* backlog triage */
+.wp-modal.wp-triage-modal { width: min(520px, 96vw); }
+.wp-triage-progress { margin-bottom: 6px; }
+.wp-triage-card { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 14px; border-radius: 10px; background: var(--background-secondary); margin-bottom: 12px; }
+.wp-triage-title { font-size: 18px; font-weight: 600; line-height: 1.3; }
+.wp-triage-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.wp-modal button.wp-triage-btn { display: flex; align-items: center; gap: 8px; height: 40px; justify-content: flex-start; padding: 0 12px; }
+.wp-triage-btn .wp-ico svg { width: 16px; height: 16px; }
+.wp-triage-key { margin-left: auto; font-size: var(--font-ui-smaller); color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.mod-cta .wp-triage-key { color: var(--text-on-accent); opacity: .7; }
+.wp-triage-days { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.wp-triage-done { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+.wp-triage-link { opacity: 1 !important; }
+/* phone: three modes + five icons must fit one row */
+.wp-root.is-mobile button.wp-seg-btn { padding: 0 9px; }
+.wp-root.is-mobile .wp-m-row button.wp-icon-btn { width: 31px; }

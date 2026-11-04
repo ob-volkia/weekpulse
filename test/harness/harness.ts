@@ -7,6 +7,8 @@ import { FocusTimer, FocusView } from "../../src/focus";
 import { PlanningModal } from "../../src/planning";
 import { TaskPalette, PromptModal } from "../../src/palette";
 import { buildReview } from "../../src/review";
+import { ProjectsView } from "../../src/projectsView";
+import { TriageModal } from "../../src/triage";
 
 const T = today(); const W = startOfWeek(T); const d = (n: number) => addDays(W, n);
 const vault = new MemVault();
@@ -43,7 +45,8 @@ const plugin: any = { store, settings, saveSettings() {}, activateHabits: () => 
   promptText: (t: string, i: string, cb: any) => new PromptModal(app as any, t, i, cb).open(),
   openDaily: (d: string) => console.log("daily", d), openSource: (t: any) => console.log("source", t.source), openFile: (p: string) => console.log("open", p),
   createReview: async (w: string) => { (window as any).review = buildReview(store, [], w); console.log((window as any).review); },
-  notify: (a: string, b: string) => console.log("notify", a, b), openArchived: (t: any) => console.log("archived", t), refreshCalendars: () => {} };
+  notify: (a: string, b: string) => console.log("notify", a, b), openArchived: (t: any) => console.log("archived", t), refreshCalendars: () => {},
+  activateProjects: () => show("projects"), openTriage: () => new TriageModal(app as any, plugin).open(), openLog: () => {} };
 plugin.focus = new FocusTimer(plugin);
 
 const container = document.getElementById("app")!;
@@ -51,7 +54,7 @@ let view: any;
 async function show(kind: string) {
   container.innerHTML = "";
   container.className = innerWidth < 720 ? "is-phone-sim" : "";
-  const V: any = kind === "week" ? WeekView : kind === "focus" ? FocusView : HabitsView;
+  const V: any = kind === "week" ? WeekView : kind === "focus" ? FocusView : kind === "projects" ? ProjectsView : HabitsView;
   view = new V({ container, app } as any, plugin);
   // registerEvent is a no-op in the shim; subscribe directly.
   (view as any).registerEvent = () => {};

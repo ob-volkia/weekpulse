@@ -37,7 +37,7 @@ export class TFolder { children: TFile[] = []; constructor(public path: string) 
 export const normalizePath = (p: string) => p.replace(/\/+/g, "/").replace(/^\/|\/$/g, "");
 export const Platform = { get isPhone() { return (window as any).__phone === true; }, isMobile: false };
 
-const ALIAS: Record<string, string> = { "alert-triangle": "triangle-alert", "bar-chart-2": "chart-column", "more-horizontal": "ellipsis", "wand-2": "wand-sparkles", "layout-template": "layout-template", "edit": "pencil" };
+const ALIAS: Record<string, string> = { "folder-kanban": "folder-kanban", "check-circle-2": "circle-check", "alert-triangle": "triangle-alert", "bar-chart-2": "chart-column", "more-horizontal": "ellipsis", "wand-2": "wand-sparkles", "layout-template": "layout-template", "edit": "pencil" };
 const svgCache = new Map<string, Promise<string>>();
 export function setIcon(el: HTMLElement, name: string) {
   const n = ALIAS[name] ?? name;

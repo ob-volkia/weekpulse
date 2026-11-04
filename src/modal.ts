@@ -32,11 +32,11 @@ export class TaskModal extends Modal {
   private commentsEl!: HTMLElement;
   private subsEl!: HTMLElement;
 
-  constructor(app: App, private plugin: WeekPlannerPlugin, task: Task | null, defaultDue: DateStr | null) {
+  constructor(app: App, private plugin: WeekPlannerPlugin, task: Task | null, defaultDue: DateStr | null, initial: Partial<Task> = {}) {
     super(app);
     this.store = plugin.store;
     this.isNew = !task;
-    this.draft = task ? structuredClone(task) : emptyTask({ due: defaultDue });
+    this.draft = task ? structuredClone(task) : emptyTask({ ...initial, due: defaultDue });
   }
 
   async onOpen() {
