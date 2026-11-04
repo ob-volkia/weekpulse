@@ -7,6 +7,8 @@ import { TaskModal } from "../modal";
 import { ICON, icon, iconText } from "../ui";
 import type { WeekView } from "../weekView";
 import { STALE_AT, tagColor } from "./shared";
+import { profileDot } from "../profiles";
+import { ALL_PROFILES } from "../store";
 
 export function renderCard(v: WeekView, parent: HTMLElement, t: Task, mini = false): HTMLElement {
   const card = parent.createDiv({ cls: `wp-card prio-${t.priority}`, attr: { "data-id": t.id } });
@@ -33,6 +35,10 @@ export function renderCard(v: WeekView, parent: HTMLElement, t: Task, mini = fal
   }
   if (!mini) {
     const meta = body.createDiv("wp-card-meta");
+    if (v.store.profile === ALL_PROFILES && v.settings.profiles.length > 1) {
+      const p = v.store.profileInfo(v.store.profileOf(t));
+      if (p) profileDot(meta.createSpan({ cls: "wp-meta", attr: { "aria-label": p.name } }), p);
+    }
     if (t.time) meta.createSpan({ cls: "wp-meta wp-time", text: t.time });
     if (t.duration) meta.createSpan({ cls: "wp-meta", text: fmtMinutes(t.duration) });
     if (t.spent) iconText(meta, ICON.spent, fmtMinutes(t.spent), "wp-meta wp-spent", "Потрачено в фокусе");

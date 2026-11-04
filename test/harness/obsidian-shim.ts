@@ -101,7 +101,8 @@ export class FuzzySuggestModal<T> extends SuggestModal<any> {
 }
 export type FuzzyMatch<T> = { item: T; match: any }; export type MarkdownPostProcessorContext = any;
 export async function requestUrl(o: { url: string }) { return { text: `<title>Страница ${o.url.split("/")[2] ?? ""}</title>` }; }
-export class Plugin {} export class PluginSettingTab {} export class Setting {}
+export class Plugin {}
+(globalThis as any).__ls = {}; export class PluginSettingTab {} export class Setting {}
 export type App = any; export type WorkspaceLeaf = any;
 
 // ---------- in-memory vault ----------

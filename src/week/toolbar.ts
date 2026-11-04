@@ -7,6 +7,7 @@ import { icon } from "../ui";
 import type { WeekView } from "../weekView";
 import { Mode, cap } from "./shared";
 import { renderMobileToolbar } from "./mobile";
+import { profileButton } from "../profiles";
 
 export function filterMenu(v: WeekView, e: MouseEvent) {
   const m = new Menu();
@@ -117,6 +118,7 @@ export function renderToolbar(v: WeekView, root: HTMLElement, mode: Mode) {
   }
 
   const right = bar.createDiv("wp-toolbar-right");
+  profileButton(v.plugin, right);
   if (mode !== "month") goalsButton(v, right, false);
   filterButton(v, right, false);
   iconBtn(v, right, "search", "Найти задачу (⌘K)", () => v.plugin.openPalette());

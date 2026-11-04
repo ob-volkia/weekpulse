@@ -16,6 +16,7 @@ import { buildReview, reviewPath } from "./review";
 import { DEFAULT_SETTINGS, PlannerSettings, Store } from "./store";
 import { VIEW_WEEK, WeekView } from "./weekView";
 import { ICON, icon } from "./ui";
+import { PROFILE_COLORS, loadActiveProfile, profileDot } from "./profiles";
 
 export default class WeekPlannerPlugin extends Plugin {
   settings!: PlannerSettings;
@@ -29,6 +30,7 @@ export default class WeekPlannerPlugin extends Plugin {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
     this.store = new Store(this.app, this.settings);
     this.store.device = this.deviceName();
+    loadActiveProfile(this);
     this.focus = new FocusTimer(this);
 
     this.registerView(VIEW_WEEK, (leaf) => new WeekView(leaf, this));
@@ -45,6 +47,13 @@ export default class WeekPlannerPlugin extends Plugin {
       this.addCommand({ id, name, callback, hotkeys });
     cmd("open-week", "Открыть неделю", () => this.activateWeek());
     cmd("open-habits", "Открыть привычки и статистику", () => this.activateHabits());
+    cmd("switch-profile", "Переключить профиль", () => {
+      const ids = ["all", ...this.settings.profiles.map((p) => p.id)];
+      const next = ids[(ids.indexOf(this.store.profile) + 1) % ids.length];
+      this.store.setProfile(next);
+      this.app.saveLocalStorage("wp-profile", next);
+      new Notice(`Профиль: ${this.store.profileInfo(next)?.name ?? "Всё"}`);
+    });
     cmd("open-projects", "Открыть проекты", () => this.activateProjects());
     cmd("triage-backlog", "Разобрать бэклог", () => this.openTriage());
     cmd("open-focus", "Открыть фокус (сегодня + помодоро)", () => this.activateFocus());
@@ -186,6 +195,12 @@ export default class WeekPlannerPlugin extends Plugin {
       this.app.saveLocalStorage("wp-device-id", id);
     }
     return `${kind} ${id}`;
+  }
+
+  openSettings() {
+    const setting = (this.app as unknown as { setting?: { open(): void; openTabById(id: string): void } }).setting;
+    setting?.open();
+    setting?.openTabById(this.manifest.id);
   }
 
   openLog() {
@@ -428,6 +443,10 @@ export default class WeekPlannerPlugin extends Plugin {
   }
 }
 
+const COLOR_NAMES: Record<string, string> = {
+  blue: "Синий", green: "Зелёный", purple: "Фиолетовый", orange: "Оранжевый", cyan: "Бирюзовый", pink: "Розовый", yellow: "Жёлтый", red: "Красный",
+};
+
 class PlannerSettingTab extends PluginSettingTab {
   constructor(app: App, private plugin: WeekPlannerPlugin) {
     super(app, plugin);
@@ -457,6 +476,38 @@ class PlannerSettingTab extends PluginSettingTab {
         await save();
         if (key === "scanVault") v ? this.plugin.store.scanExternal() : (this.plugin.store.external.clear(), this.plugin.store.trigger("changed"));
       }));
+
+    new Setting(containerEl).setName("Профили").setHeading();
+    containerEl.createDiv({ cls: "setting-item-description", text: "Задачи делятся по профилям; переключатель в шапке планера. Загрузка дня считается по всем профилям сразу." });
+    for (const p of s.profiles) {
+      const row = new Setting(containerEl)
+        .addText((t) => t.setValue(p.name).setPlaceholder("Название").onChange(async (val) => { p.name = val.trim() || p.name; await save(); }))
+        .addDropdown((d) => {
+          for (const c of PROFILE_COLORS) d.addOption(c, COLOR_NAMES[c]);
+          d.setValue(p.color).onChange(async (val) => { p.color = val; await save(); });
+        });
+      row.nameEl.empty();
+      profileDot(row.nameEl, p);
+      if (s.profiles.length > 1)
+        row.addExtraButton((b) => b.setIcon("trash").setTooltip("Удалить профиль (его задачи перейдут в профиль по умолчанию)").onClick(async () => {
+          s.profiles = s.profiles.filter((x) => x.id !== p.id);
+          if (s.defaultProfile === p.id) s.defaultProfile = s.profiles[0].id;
+          if (this.plugin.store.profile === p.id) this.plugin.store.profile = "all";
+          await save();
+          this.display();
+        }));
+    }
+    new Setting(containerEl).addButton((b) => b.setButtonText("Добавить профиль").onClick(async () => {
+      const used = new Set(s.profiles.map((p) => p.color));
+      s.profiles.push({ id: Math.random().toString(36).slice(2, 7), name: "Новый профиль", color: PROFILE_COLORS.find((c) => !used.has(c)) ?? "purple" });
+      await save();
+      this.display();
+    }));
+    new Setting(containerEl).setName("Профиль по умолчанию").setDesc("Сюда попадают задачи без профиля, а также новые задачи в режиме «Всё»")
+      .addDropdown((d) => {
+        for (const p of s.profiles) d.addOption(p.id, p.name);
+        d.setValue(s.defaultProfile).onChange(async (val) => { s.defaultProfile = val; await save(); });
+      });
 
     new Setting(containerEl).setName("Файлы").setHeading();
     text("Файл задач", "Все задачи хранятся в этом файле", "tasksFile");

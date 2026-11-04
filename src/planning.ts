@@ -56,8 +56,8 @@ export class PlanningModal extends Modal {
 
     const body = c.createDiv("wp-plan-body");
     const pool = body.createDiv({ cls: "wp-plan-pool wp-list", attr: { "data-drop": "backlog", "data-drop-list": "" } });
-    const leftovers = store.tasks().filter((t) => this.leftovers.has(t.id) && !t.done);
-    const backlog = store.tasks().filter((t) => !t.done && t.due === null);
+    const leftovers = store.tasks().filter((t) => this.leftovers.has(t.id) && !t.done && store.inProfile(t));
+    const backlog = store.tasks().filter((t) => !t.done && t.due === null && store.inProfile(t));
     const section = (title: string, list: Task[], hint: string) => {
       pool.createDiv({ cls: "wp-plan-section", text: `${title} · ${list.length}` });
       if (!list.length) pool.createDiv({ cls: "wp-muted wp-plan-empty", text: hint });
@@ -71,8 +71,9 @@ export class PlanningModal extends Modal {
     const daysEl = body.createDiv("wp-plan-days");
     const cap = this.plugin.settings.dayCapacityHours * 60;
     for (const d of days) {
-      const tasks = store.tasks().filter((t) => t.due === d && !this.leftovers.has(t.id));
-      const minutes = tasks.filter((t) => !t.done).reduce((s, t) => s + t.duration, 0);
+      const tasks = store.tasks().filter((t) => t.due === d && !this.leftovers.has(t.id) && store.inProfile(t));
+      // Load counts every profile: the hours in a day are shared.
+      const minutes = store.tasks().filter((t) => t.due === d && !t.done).reduce((s, t) => s + t.duration, 0);
       const day = daysEl.createDiv("wp-plan-day");
       if (d === now) day.addClass("is-today");
       if (d < now) day.addClass("is-past");

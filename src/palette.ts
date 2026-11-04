@@ -48,7 +48,8 @@ export class TaskPalette extends FuzzySuggestModal<Task> {
     const body = el.createDiv("wp-palette-body");
     body.createDiv({ cls: "wp-palette-title", text: displayTitle(t) });
     if (t.archivePath) el.addClass("is-archived");
-    const meta = [t.archivePath ? `архив · выполнено ${t.doneDate ? humanDay(t.doneDate) : ""}` : t.due ? humanDay(t.due) : "бэклог", t.time ?? "", ...t.tags.map((x) => "#" + x), t.source ? `из ${t.source.path.replace(/\.md$/, "")}` : ""].filter(Boolean);
+    const prof = this.plugin.settings.profiles.length > 1 ? this.plugin.store.profileInfo(this.plugin.store.profileOf(t))?.name ?? "" : "";
+    const meta = [prof, t.archivePath ? `архив · выполнено ${t.doneDate ? humanDay(t.doneDate) : ""}` : t.due ? humanDay(t.due) : "бэклог", t.time ?? "", ...t.tags.map((x) => "#" + x), t.source ? `из ${t.source.path.replace(/\.md$/, "")}` : ""].filter(Boolean);
     body.createDiv({ cls: "wp-muted", text: meta.join(" · ") });
   }
 

@@ -39,6 +39,14 @@ export interface PlannerSettings {
   taskNotesFolder: string;
   attachmentsFolder: string;
   logFolder: string;
+  profiles: Profile[];
+  defaultProfile: string; // tasks without [profile::] belong here
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  color: string; // one of the theme colors: blue, green, purple, orange, cyan, pink, yellow, red
 }
 
 export interface SavedFilter {
@@ -85,7 +93,14 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   taskNotesFolder: "Planner/Tasks",
   attachmentsFolder: "Planner/Attachments",
   logFolder: "Planner/Log",
+  profiles: [
+    { id: "work", name: "Работа", color: "blue" },
+    { id: "personal", name: "Личное", color: "green" },
+  ],
+  defaultProfile: "personal",
 };
+
+export const ALL_PROFILES = "all";
 
 export interface Template {
   name: string;
@@ -132,6 +147,7 @@ export class Store extends Events {
   private lastWritten = new Map<string, string>(); // our latest write per file
   private base = new Map<string, string>(); // last version we shared with other devices
   device = "Устройство"; // set by the plugin: "Mac", "iPhone"…
+  profile: string = ALL_PROFILES; // active profile on this device
   private logQueue: Promise<void> = Promise.resolve();
   private undoStack: { label: string; path: string; text: string }[] = [];
 
@@ -155,6 +171,34 @@ export class Store extends Events {
   /** Tasks.md plus dated tasks found in other notes. */
   all(): Task[] {
     return this.settings.scanVault ? [...this.tasks(), ...this.external.all()] : this.tasks();
+  }
+
+  profileOf(t: Task): string {
+    const id = t.profile ?? this.settings.defaultProfile;
+    return this.settings.profiles.some((p) => p.id === id) ? id : this.settings.defaultProfile;
+  }
+
+  profileInfo(id: string): Profile | undefined {
+    return this.settings.profiles.find((p) => p.id === id);
+  }
+
+  inProfile(t: Task): boolean {
+    return this.profile === ALL_PROFILES || this.profileOf(t) === this.profile;
+  }
+
+  /** Tasks of the active profile (all profiles when «Всё» is selected). */
+  shown(): Task[] {
+    return this.all().filter((t) => this.inProfile(t));
+  }
+
+  /** Profile a new task should get: the active one, or the default under «Всё». */
+  newTaskProfile(): string | null {
+    return this.profile === ALL_PROFILES ? this.settings.defaultProfile : this.profile;
+  }
+
+  setProfile(id: string) {
+    this.profile = id;
+    this.trigger("changed");
   }
 
   find(id: string): Task | undefined {
@@ -444,7 +488,7 @@ export class Store extends Events {
   // ---------- task operations ----------
 
   async add(partial: Partial<Task>, due: DateStr | null) {
-    const task = emptyTask({ ...partial, due, created: today() });
+    const task = emptyTask({ profile: this.newTaskProfile(), ...partial, due, created: today() });
     await this.mutate((doc) => {
       const idx = insertIndexForDay(doc, due);
       doc.lines.splice(idx, 0, { kind: "task", task });
@@ -576,7 +620,7 @@ export class Store extends Events {
   async addMany(items: { task: Partial<Task>; due: DateStr | null }[]) {
     await this.mutate((doc) => {
       for (const it of items) {
-        const task = emptyTask({ ...it.task, id: newId(), due: it.due, created: today() });
+        const task = emptyTask({ profile: this.newTaskProfile(), ...it.task, id: newId(), due: it.due, created: today() });
         doc.lines.splice(insertIndexForDay(doc, it.due), 0, { kind: "task", task });
       }
     });

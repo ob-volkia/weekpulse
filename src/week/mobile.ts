@@ -11,6 +11,7 @@ import { BACKLOG, Mode, cap } from "./shared";
 import { renderCard } from "./card";
 import { moreMenu, goalsMenu, dayMenu, filterButton, arrow, iconBtn } from "./toolbar";
 import { renderEvents } from "./columns";
+import { profileButton } from "../profiles";
 
 export function renderMobileToolbar(v: WeekView, root: HTMLElement, mode: Mode) {
   const bar = root.createDiv("wp-toolbar wp-m-toolbar");
@@ -18,12 +19,15 @@ export function renderMobileToolbar(v: WeekView, root: HTMLElement, mode: Mode) 
   arrow(v, row1, -1, "Назад", mode !== "month");
   row1.createEl("button", { text: "Сегодня", cls: "wp-today-btn" }).onclick = () => v.goToday();
   arrow(v, row1, 1, "Вперёд", mode !== "month");
+  profileButton(v.plugin, row1, true);
   const title = row1.createDiv("wp-week-title");
   if (mode === "month") {
     const a = parse(v.monthAnchor());
     title.setText(`${MONTH_NOM[a.getMonth()]} ${a.getFullYear()}`);
   } else {
-    title.createSpan({ text: weekLabel(v.weekStart) });
+    // The year only when it isn't the current one: the row also holds the profile chip.
+    const label = weekLabel(v.weekStart);
+    title.createSpan({ text: label.endsWith(today().slice(0, 4)) ? label.slice(0, -5) : label });
   }
   const row2 = bar.createDiv("wp-m-row");
   const seg = row2.createDiv("wp-segmented wp-mode");

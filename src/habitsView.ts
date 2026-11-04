@@ -6,6 +6,7 @@ import { tagColor } from "./weekView";
 import type WeekPlannerPlugin from "./main";
 import { ICON, icon, iconButton, iconText } from "./ui";
 import { Bucket, computeTrends } from "./trends";
+import { profileButton } from "./profiles";
 
 export const VIEW_HABITS = "week-planner-habits";
 
@@ -47,6 +48,7 @@ export class HabitsView extends ItemView {
     b("chevron-right", "Следующая неделя", () => { this.weekStart = addDays(this.weekStart, 7); this.render(); });
     nav.createDiv({ cls: "wp-week-title", text: weekLabel(this.weekStart) });
     const right = bar.createDiv("wp-toolbar-right");
+    profileButton(this.plugin, right, Platform.isPhone);
     const back = right.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": "Неделя" } });
     setIcon(back, "calendar-days");
     back.onclick = () => this.plugin.activateWeek();
@@ -174,7 +176,7 @@ export class HabitsView extends ItemView {
       const b = seg.createEl("button", { text: `${n} нед.`, cls: `wp-seg-btn ${this.trendWeeks === n ? "is-active" : ""}` });
       b.onclick = () => { this.trendWeeks = n; this.render(); };
     }
-    const tr = computeTrends([...this.store.all(), ...this.archive], today(), this.trendWeeks);
+    const tr = computeTrends([...this.store.shown(), ...this.archive.filter((t) => this.store.inProfile(t))], today(), this.trendWeeks);
     if (!tr.weeks.some((w) => w.planned || w.done)) {
       sec.createDiv({ cls: "wp-empty", text: "Данных пока мало: тренды появятся через пару недель работы с планером." });
       return;
@@ -256,7 +258,7 @@ export class HabitsView extends ItemView {
     const rv = iconButton(sh, ICON.review, "Итоги недели", "wp-chip-btn");
     rv.onclick = () => this.plugin.createReview(this.weekStart);
     const days = weekDays(this.weekStart);
-    const all = [...this.store.all(), ...this.archive];
+    const all = [...this.store.shown(), ...this.archive.filter((t) => this.store.inProfile(t))];
     const inWeek = all.filter((t) => t.due && t.due >= days[0] && t.due <= days[6]);
     const done = inWeek.filter((t) => t.done);
     const minutesDone = done.reduce((s, t) => s + t.duration, 0);
@@ -375,7 +377,7 @@ export class HabitsView extends ItemView {
     legend.createSpan({ text: "больше" });
 
     // most postponed
-    const stale = this.store.tasks().filter((t) => !t.done && t.moved >= 2).sort((a, b) => b.moved - a.moved).slice(0, 5);
+    const stale = this.store.tasks().filter((t) => this.store.inProfile(t) && !t.done && t.moved >= 2).sort((a, b) => b.moved - a.moved).slice(0, 5);
     if (stale.length) {
       const sc = sec.createDiv("wp-chart");
       sc.createDiv({ cls: "wp-chart-title", text: "Чаще всего откладываются" });

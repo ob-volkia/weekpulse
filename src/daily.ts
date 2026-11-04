@@ -61,7 +61,7 @@ function drawDay(plugin: WeekPlannerPlugin, root: HTMLElement, day: DateStr) {
   const store = plugin.store;
   root.empty();
   root.addClass("wp-block");
-  const all = store.all();
+  const all = store.shown();
   const order = new Map(all.map((t, i) => [t.id, i]));
   const tasks: Task[] = all.filter((t) => store.effectiveDue(t) === day).sort((a, b) => compareInDay(a, b, order.get(a.id)!, order.get(b.id)!));
   const done = tasks.filter((t) => t.done).length;

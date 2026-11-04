@@ -174,6 +174,7 @@ export class WeekView extends ItemView {
   // ---------- data ----------
 
   matches(t: Task) {
+    if (!this.store.inProfile(t)) return false;
     const f = this.filter;
     if (f.tag && !t.tags.includes(f.tag)) return false;
     if (f.minPriority != null && t.priority < f.minPriority) return false;
@@ -220,10 +221,12 @@ export class WeekView extends ItemView {
   }
 
   dayStats(day: DateStr | null) {
-    const list = this.store.all().filter((t) => this.store.effectiveDue(t) === day && this.matches(t));
+    const dayTasks = this.store.all().filter((t) => this.store.effectiveDue(t) === day);
+    const list = dayTasks.filter((t) => this.matches(t));
     const done = list.filter((t) => t.done).length;
     const events = day ? this.events(day).reduce((s, e) => s + e.minutes, 0) : 0;
-    const minutes = list.filter((t) => !t.done).reduce((s, t) => s + t.duration, 0) + events;
+    // The day's load counts every profile: hours are shared, whichever profile is on screen.
+    const minutes = dayTasks.filter((t) => !t.done).reduce((s, t) => s + t.duration, 0) + events;
     return { total: list.length, done, minutes };
   }
 

@@ -15,7 +15,7 @@ const vault = new MemVault();
 vault.files.set("Planner/Tasks.md", `# Задачи
 
 - [x] Разобрать почту #работа [dur:: 30m] 📅 ${d(0)} ✅ ${d(0)} 🆔 a1
-- [ ] Созвон с командой #работа [time:: 11:00] [dur:: 1h] ⏫ 🔁 every weekday 📅 ${T} 🆔 a2
+- [ ] Созвон с командой #работа [profile:: work] [time:: 11:00] [dur:: 1h] ⏫ 🔁 every weekday 📅 ${T} 🆔 a2
 - [ ] Написать отчёт за октябрь #работа [dur:: 2h] [moved:: 6] [spent:: 50m] 🔺 📅 ${T} 🆔 a3
     - [x] собрать цифры
     - [ ] графики
@@ -23,7 +23,7 @@ vault.files.set("Planner/Tasks.md", `# Задачи
 - [ ] Купить продукты #дом 📅 ${T} 🆔 a4
 - [ ] Спортзал #здоровье [time:: 19:00] [dur:: 1h30m] 🔁 every week on Tuesday, Thursday 📅 ${addDays(T,1)} 🆔 a5
 - [ ] Записаться к стоматологу #здоровье 🔼 📅 ${addDays(T,2)} 🆔 a6
-- [ ] Ревью PR коллег #работа [dur:: 45m] 📅 ${addDays(T,1)} 🆔 a7
+- [ ] Ревью PR коллег #работа [profile:: work] [dur:: 45m] 📅 ${addDays(T,1)} 🆔 a7
 - [ ] Прочитать «Deep Work» #учёба 🔽 🆔 a8
 - [ ] Идеи для отпуска #дом 🆔 a9
 - [x] Оплатить интернет #дом 📅 ${d(1)} ✅ ${d(1)} 🆔 b1
@@ -34,7 +34,7 @@ vault.files.set("Planner/Habits.md", `# Привычки\n\n## Список\n\n-
 
 vault.files.set("Проекты/Сайт.md", `# Сайт\n\n- [ ] Сверстать лендинг [[Сайт]] 📅 ${addDays(T,-2)}\n- [ ] Подключить аналитику 📅 ${addDays(T,2)} ^blk1\n`);
 vault.files.set("Planner/Templates.md", `# Шаблоны\n\n## Рабочий понедельник\n- [ ] Планёрка #работа [time:: 10:00] [dur:: 30m] [day:: 1]\n- [ ] Спорт [day:: 3]\n`);
-const app = { vault, workspace: { openLinkText() {}, getLeaf() { return { openFile() {}, setEphemeralState() {} }; } }, metadataCache: { getFileCache: () => null } };
+const app = { loadLocalStorage: (k: string) => localStorage.getItem(k), saveLocalStorage: (k: string, v: string) => localStorage.setItem(k, v), vault, workspace: { openLinkText() {}, getLeaf() { return { openFile() {}, setEphemeralState() {} }; } }, metadataCache: { getFileCache: () => null } };
 const settings = { ...DEFAULT_SETTINGS };
 const store = new Store(app as any, settings);
 (window as any).store = store; (window as any).vault = vault;
@@ -48,6 +48,7 @@ const plugin: any = { store, settings, saveSettings() {}, activateHabits: () => 
   notify: (a: string, b: string) => console.log("notify", a, b), openArchived: (t: any) => console.log("archived", t), refreshCalendars: () => {},
   activateProjects: () => show("projects"), openTriage: () => new TriageModal(app as any, plugin).open(), openLog: () => {} };
 plugin.focus = new FocusTimer(plugin);
+plugin.app = app;
 
 const container = document.getElementById("app")!;
 let view: any;

@@ -255,5 +255,21 @@ END:VCALENDAR`;
     eq("estimate accuracy: median of 1.5 and 0.5", [tr.accuracy?.count, tr.accuracy?.ratio, tr.accuracy?.over], [2, 1, 0.5]);
     eq("weekday totals", tr.weekdays.map((d) => d.done), [2, 1, 0, 0, 0, 0, 0]);
   }
+  // profiles
+  {
+    const { vault, store } = await fresh(`- [ ] Отчёт [profile:: work] 📅 ${T} 🆔 w\n- [ ] Молоко 📅 ${T} 🆔 p\n- [ ] Чужой [profile:: gone] 📅 ${T} 🆔 g\n`);
+    eq("profile parsed, roundtrip keeps it", [store.find("w")!.profile, line(vault, "w").includes("[profile:: work]")], ["work", true]);
+    eq("no profile → default; unknown profile → default", [store.profileOf(store.find("p")!), store.profileOf(store.find("g")!)], ["personal", "personal"]);
+    eq("«Всё» shows everything", store.shown().map((t) => t.id), ["w", "p", "g"]);
+    store.setProfile("work");
+    eq("work shows only work", store.shown().map((t) => t.id), ["w"]);
+    const added = await store.add({ title: "Созвон" }, T);
+    eq("new task gets the active profile", added.profile, "work");
+    store.setProfile("all");
+    const added2 = await store.add({ title: "Купить" }, T);
+    eq("under «Всё» new task gets the default profile", added2.profile, "personal");
+    store.setProfile("personal");
+    eq("personal shows default and orphaned tasks", store.shown().map((t) => t.id).sort(), ["g", "p", added2.id].sort());
+  }
   process.exit(fail ? 1 : 0);
 })();

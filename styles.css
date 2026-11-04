@@ -797,3 +797,17 @@ button.wp-danger { color: var(--color-red); }
 .wp-spark-bar { flex: 1; background: var(--text-faint); border-radius: 1px; min-width: 2px; }
 .wp-accuracy { font-size: var(--font-ui-medium); font-weight: 600; margin-bottom: 2px; }
 @media (max-width: 720px) { .wp-trend-row { grid-template-columns: 90px 1fr 48px 44px; } }
+
+/* ======================= v3.3: profiles ======================= */
+.wp-profile-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--text-faint); }
+.pc-blue { background: var(--color-blue); } .pc-green { background: var(--color-green); } .pc-purple { background: var(--color-purple); }
+.pc-orange { background: var(--color-orange); } .pc-cyan { background: var(--color-cyan); } .pc-pink { background: var(--color-pink); }
+.pc-yellow { background: var(--color-yellow); } .pc-red { background: var(--color-red); }
+.wp-root button.wp-profile-btn { display: inline-flex; align-items: center; gap: 6px; max-width: 160px; }
+.wp-root button.wp-profile-btn .wp-profile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-root button.wp-profile-btn .wp-ico svg { width: 13px; height: 13px; }
+.wp-root button.wp-profile-btn .wp-chevron { opacity: .6; }
+.wp-root button.wp-profile-btn.is-set { background: var(--background-modifier-hover); color: var(--text-normal); }
+.wp-card-meta .wp-profile-dot { width: 7px; height: 7px; }
+.wp-root.is-mobile .wp-m-row button.wp-profile-btn { height: 28px; padding: 0 8px; margin-left: 2px; max-width: 110px; }
+.setting-item-name .wp-profile-dot { width: 12px; height: 12px; }

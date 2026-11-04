@@ -14,7 +14,7 @@ export class TriageModal extends Modal {
   constructor(app: App, private plugin: WeekPlannerPlugin) {
     super(app);
     const key = (t: Task) => t.created ?? "0000";
-    this.queue = plugin.store.tasks().filter((t) => !t.done && !t.due).sort((a, b) => key(a).localeCompare(key(b))).map((t) => t.id);
+    this.queue = plugin.store.tasks().filter((t) => !t.done && !t.due && plugin.store.inProfile(t)).sort((a, b) => key(a).localeCompare(key(b))).map((t) => t.id);
   }
 
   onOpen() {

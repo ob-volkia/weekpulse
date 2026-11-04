@@ -1,9 +1,10 @@
-import { ItemView, WorkspaceLeaf, setIcon } from "obsidian";
+import { ItemView, Platform, WorkspaceLeaf, setIcon } from "obsidian";
 import { DAY_SHORT, fmtMinutes, humanDay, relativeLabel, today, weekday } from "./dates";
 import { Task, displayTitle, projectOf } from "./model";
 import { TaskModal } from "./modal";
 import { icon } from "./ui";
 import type WeekPlannerPlugin from "./main";
+import { profileButton } from "./profiles";
 
 export const VIEW_PROJECTS = "week-planner-projects";
 
@@ -40,7 +41,7 @@ export class ProjectsView extends ItemView {
   private projects(): Project[] {
     const now = today();
     const map = new Map<string, Project>();
-    for (const t of [...this.plugin.store.all(), ...this.archive]) {
+    for (const t of [...this.plugin.store.shown(), ...this.archive.filter((t) => this.plugin.store.inProfile(t))]) {
       const name = projectOf(t);
       if (!name) continue;
       const p = map.get(name) ?? { name, open: [], done: 0, total: 0, spent: 0, left: 0, overdue: 0 };
@@ -70,6 +71,7 @@ export class ProjectsView extends ItemView {
     const bar = root.createDiv("wp-toolbar");
     bar.createDiv({ cls: "wp-week-title", text: "Проекты" });
     const right = bar.createDiv("wp-toolbar-right");
+    profileButton(this.plugin, right, Platform.isPhone);
     const fin = right.createEl("button", { cls: `wp-chip-btn ${this.showFinished ? "is-active" : ""}`, text: "Завершённые" });
     fin.onclick = () => { this.showFinished = !this.showFinished; this.render(); };
     const back = right.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": "Неделя" } });

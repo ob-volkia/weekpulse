@@ -11,12 +11,13 @@ import { TaskBody, emptyBody, nowStamp, titleFromHtml } from "./tasknotes";
 import type WeekPlannerPlugin from "./main";
 import { STALE_AT } from "./weekView";
 import { ICON, icon, iconButton, iconText } from "./ui";
+import { profileDot } from "./profiles";
 
 const PRIORITIES: Priority[] = [3, 2, 1, 0, -1];
 const EN_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|heic|svg)$/i;
 
-type Panel = "date" | "time" | "deadline" | "priority" | "tags" | "repeat" | "goal" | null;
+type Panel = "date" | "time" | "deadline" | "priority" | "tags" | "repeat" | "goal" | "profile" | null;
 
 export class TaskModal extends Modal {
   private draft: Task;
@@ -36,7 +37,7 @@ export class TaskModal extends Modal {
     super(app);
     this.store = plugin.store;
     this.isNew = !task;
-    this.draft = task ? structuredClone(task) : emptyTask({ ...initial, due: defaultDue });
+    this.draft = task ? structuredClone(task) : emptyTask({ profile: plugin.store.newTaskProfile(), ...initial, due: defaultDue });
   }
 
   async onOpen() {
@@ -143,6 +144,11 @@ export class TaskModal extends Modal {
     this.chipsEl.empty();
     const dueLabel = t.due ? relativeLabel(t.due) ?? `${DAY_SHORT[weekday(t.due) - 1]}, ${humanDay(t.due)}` : "Бэклог";
     this.chip("date", t.due ? "calendar" : ICON.backlog, dueLabel);
+    if (this.plugin.settings.profiles.length > 1) {
+      const p = this.store.profileInfo(this.store.profileOf(t));
+      const c = this.chip("profile", "circle", p?.name ?? "Профиль");
+      c.querySelector(".wp-ico")?.replaceWith(profileDot(createSpan(), p));
+    }
     this.chip("time", "clock", t.time || t.duration ? [t.time, t.duration ? fmtMinutes(t.duration) : ""].filter(Boolean).join(" · ") : "Время", { empty: !t.time && !t.duration });
     if (t.deadline) {
       const left = diffDays(t.deadline, today());
@@ -243,6 +249,12 @@ export class TaskModal extends Modal {
         });
         break;
       }
+      case "profile":
+        for (const p of this.plugin.settings.profiles) {
+          const b = quick(p.name, () => (t.profile = p.id), this.store.profileOf(t) === p.id);
+          b.prepend(profileDot(createSpan(), p));
+        }
+        break;
       case "goal": {
         quick("Без цели", () => (t.goal = null), !t.goal);
         for (const g of this.store.goalsFor(startOfWeek(t.due ?? now))) quick(g.title, () => (t.goal = g.id), t.goal === g.id);

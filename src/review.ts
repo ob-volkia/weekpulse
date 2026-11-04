@@ -12,10 +12,10 @@ export function reviewPath(folder: string, weekStart: DateStr) {
 export function buildReview(store: Store, archive: Task[], weekStart: DateStr): string {
   const days = weekDays(weekStart);
   const inWeek = (d: DateStr | null) => !!d && d >= days[0] && d <= days[6];
-  const all = [...store.all(), ...archive];
+  const all = [...store.shown(), ...archive.filter((t) => store.inProfile(t))];
   const planned = all.filter((t) => inWeek(t.due) || inWeek(t.doneDate));
   const done = planned.filter((t) => t.done && inWeek(t.doneDate));
-  const open = store.tasks().filter((t) => !t.done && t.due && t.due <= days[6] && t.moved > 0);
+  const open = store.tasks().filter((t) => store.inProfile(t) && !t.done && t.due && t.due <= days[6] && t.moved > 0);
   const pct = planned.length ? Math.round((done.length / planned.length) * 100) : 0;
   const spent = done.reduce((s, t) => s + t.spent, 0) + planned.filter((t) => !t.done).reduce((s, t) => s + t.spent, 0);
   const estimated = done.reduce((s, t) => s + t.duration, 0);

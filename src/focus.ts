@@ -3,6 +3,7 @@ import { fmtMinutes, humanDay, today } from "./dates";
 import { Task, compareInDay, displayTitle } from "./model";
 import type WeekPlannerPlugin from "./main";
 import { ICON, iconButton, iconText } from "./ui";
+import { profileButton } from "./profiles";
 
 export const VIEW_FOCUS = "week-planner-focus";
 
@@ -164,7 +165,7 @@ export class FocusView extends ItemView {
 
   private todayTasks(): Task[] {
     const store = this.plugin.store;
-    const all = store.all();
+    const all = store.shown();
     const order = new Map(all.map((t, i) => [t.id, i]));
     return all.filter((t) => store.effectiveDue(t) === today())
       .sort((a, b) => compareInDay(a, b, order.get(a.id)!, order.get(b.id)!));
@@ -181,6 +182,7 @@ export class FocusView extends ItemView {
     const bar = root.createDiv("wp-toolbar");
     bar.createDiv({ cls: "wp-week-title", text: `Сегодня, ${humanDay(today())}` });
     const right = bar.createDiv("wp-toolbar-right");
+    profileButton(this.plugin, right, Platform.isPhone);
     const back = right.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": "Неделя" } });
     setIcon(back, "calendar-days");
     back.onclick = () => this.plugin.activateWeek();
