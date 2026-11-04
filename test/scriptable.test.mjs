@@ -25,6 +25,7 @@ const R = (id, title, due, extra = {}) => ({ notes: "wp:" + id, title, dueDate: 
 
 let p = lib.planReminders(data, [], now);
 eq("creates only future, open, timed, own tasks", p.create.map((x) => x.id), ["b", "e"]);
+eq("alerts for the same tasks", p.alerts.map((x) => x.id), ["b", "e"]);
 
 p = lib.planReminders(data, [R("b", "Созвон", lib.at("2026-11-03", "15:00")), R("e", "Старое имя", lib.at("2026-11-04", "10:00"))], now);
 eq("unchanged kept, renamed replaced", [p.create.length, p.replace.map((x) => x.task.id), p.remove.length], [0, ["e"], 0]);

@@ -1,5 +1,6 @@
 // Week Planner for Scriptable (iPhone): a "Today" home-screen widget and sync of timed tasks
-// into Apple Reminders. Reads Planner/Export/planner.json that the Obsidian plugin keeps current.
+// into Apple Reminders. Scriptable can't attach alarms to reminders, so the alert itself is a
+// Scriptable notification scheduled ahead of time (it fires even when nothing is running). Reads Planner/Export/planner.json that the Obsidian plugin keeps current.
 //
 // Setup (once): Scriptable → Settings → File Bookmarks → + → pick iCloud Drive/Obsidian/Планер,
 // name it «Планер». Widget: add a Scriptable widget, Script = Week Planner.
@@ -85,7 +86,28 @@ function planReminders(data, existing, now) {
     if (r.title !== w.title || !r.dueDate || Math.abs(r.dueDate.getTime() - w.due.getTime()) > 30000) replace.push({ old: r, task: w });
   }
   for (const w of want.values()) if (!seen.has(w.id)) create.push(w);
-  return { create, replace, remove, completed };
+  const alerts = [...want.values()].filter((w) => !completed.some((c) => c.id === w.id));
+  return { create, replace, remove, completed, alerts };
+}
+
+/** Replace all of our pending notifications with one per upcoming timed task. */
+async function scheduleAlerts(tasks, lead) {
+  const pending = await Notification.allPending();
+  const ours = pending.filter((n) => (n.identifier || "").startsWith(TAG)).map((n) => n.identifier);
+  if (ours.length) await Notification.removePending(ours);
+  const now = Date.now();
+  for (const w of tasks) {
+    const fire = new Date(Math.max(w.due.getTime() - lead, now + 5000));
+    if (w.due.getTime() <= now) continue;
+    const n = new Notification();
+    n.identifier = TAG + w.id;
+    n.threadIdentifier = "week-planner";
+    n.title = w.title;
+    n.body = lead ? `Через ${Math.round(lead / 60000)} мин, в ${pad(w.due.getHours())}:${pad(w.due.getMinutes())}` : "Сейчас";
+    n.openURL = "obsidian://planner";
+    n.setTriggerDate(fire);
+    await n.schedule();
+  }
 }
 
 async function reminderList() {
@@ -110,12 +132,12 @@ async function syncReminders() {
     r.notes = TAG + w.id;
     r.dueDate = w.due;
     r.dueDateIncludesTime = true;
-    r.addAlarm(Alarm.absolute(new Date(w.due.getTime() - lead)));
     r.save();
   };
   for (const r of plan.remove) r.remove();
   for (const x of plan.replace) { x.old.remove(); make(x.task); }
   for (const w of plan.create) make(w);
+  await scheduleAlerts(plan.alerts, lead);
   if (plan.completed.length) {
     const inbox = await readJSON("Planner/Export/inbox.json", []);
     writeJSON("Planner/Export/inbox.json", [...(Array.isArray(inbox) ? inbox : []), ...plan.completed]);
@@ -232,7 +254,7 @@ async function main() {
   }
   if (param === "reminders") {
     const plan = await syncReminders();
-    Script.setShortcutOutput(`Напоминания: +${plan.create.length}, обновлено ${plan.replace.length}, убрано ${plan.remove.length}`);
+    Script.setShortcutOutput(`Напоминания: +${plan.create.length}, обновлено ${plan.replace.length}, убрано ${plan.remove.length}, уведомлений ${plan.alerts.length}`);
     return;
   }
   const a = new Alert();
@@ -245,7 +267,7 @@ async function main() {
     const plan = await syncReminders();
     const done = new Alert();
     done.title = "Готово";
-    done.message = `Создано ${plan.create.length}, обновлено ${plan.replace.length}, убрано ${plan.remove.length}, выполнено ${plan.completed.length}`;
+    done.message = `Создано ${plan.create.length}, обновлено ${plan.replace.length}, убрано ${plan.remove.length}, выполнено ${plan.completed.length}. Уведомлений запланировано: ${plan.alerts.length}`;
     done.addAction("OK");
     await done.present();
   } else if (choice === 1) {
