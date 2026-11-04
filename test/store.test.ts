@@ -4,7 +4,6 @@ import { expandEvents } from "../src/ics";
 import { parseQuick } from "../src/quickadd";
 import { parseBody, serializeBody } from "../src/tasknotes";
 import { mergeTasks } from "../src/merge";
-import { buildExport } from "../src/exporter";
 import { parseHabits, serializeHabits } from "../src/store";
 import { today, addDays, startOfWeek, weekday } from "../src/dates";
 
@@ -235,14 +234,6 @@ END:VCALENDAR`;
     await store.saveBody("x", "X", { description: "", links: [], files: [used], comments: [] });
     eq("only orphan reported", (await store.findUnusedAttachments()).map((f) => f.path), ["Planner/Attachments/x-orphan.png"]);
     void vault;
-  }
-  // export for the iPhone widget / Reminders
-  {
-    const { store } = await fresh(`- [ ] Созвон [time:: 15:00] 🔺 📅 ${T} 🆔 s\n- [ ] Завтра 📅 ${addDays(T, 1)} 🆔 z\n- [ ] Бэклог 🆔 b\n- [ ] Просрочено [deadline:: ${Y}] 📅 ${T} 🆔 o\n`);
-    const ex = buildExport(store, 10);
-    eq("export: today first, 8 days", [ex.days[0].date, ex.days.length], [T, 8]);
-    eq("export: today's tasks with time", ex.days[0].tasks.map((t) => [t.id, t.time, t.priority]), [["s", "15:00", 3], ["o", null, 0]]);
-    eq("export: tomorrow, backlog count, overdue deadlines", [ex.days[1].tasks.map((t) => t.id), ex.backlog, ex.overdueDeadlines.map((t) => t.id)], [["z"], 1, ["o"]]);
   }
   process.exit(fail ? 1 : 0);
 })();

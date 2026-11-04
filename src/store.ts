@@ -39,7 +39,6 @@ export interface PlannerSettings {
   taskNotesFolder: string;
   attachmentsFolder: string;
   logFolder: string;
-  exportFolder: string;
 }
 
 export interface SavedFilter {
@@ -86,7 +85,6 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   taskNotesFolder: "Planner/Tasks",
   attachmentsFolder: "Planner/Attachments",
   logFolder: "Planner/Log",
-  exportFolder: "Planner/Export",
 };
 
 export interface Template {
@@ -146,7 +144,7 @@ export class Store extends Events {
     const s = this.settings;
     return path === normalizePath(s.tasksFile) || path === normalizePath(s.habitsFile) || path === normalizePath(s.templatesFile)
       || path === normalizePath(s.goalsFile)
-      || [s.archiveFolder, s.reviewsFolder, s.backupsFolder, s.taskNotesFolder, s.attachmentsFolder, s.logFolder, s.exportFolder].some((f) => path.startsWith(normalizePath(f) + "/"));
+      || [s.archiveFolder, s.reviewsFolder, s.backupsFolder, s.taskNotesFolder, s.attachmentsFolder, s.logFolder].some((f) => path.startsWith(normalizePath(f) + "/"));
   }
 
   /** Tasks from Tasks.md only. */

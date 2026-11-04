@@ -10,7 +10,6 @@ import { PromptModal, TaskPalette } from "./palette";
 import { parseQuick } from "./quickadd";
 import { PlanningModal } from "./planning";
 import { AttachmentsModal, LogModal } from "./maintenance";
-import { Exporter } from "./exporter";
 import { buildReview, reviewPath } from "./review";
 import { DEFAULT_SETTINGS, PlannerSettings, Store } from "./store";
 import { VIEW_WEEK, WeekView } from "./weekView";
@@ -20,7 +19,6 @@ export default class WeekPlannerPlugin extends Plugin {
   settings!: PlannerSettings;
   store!: Store;
   focus!: FocusTimer;
-  exporter!: Exporter;
   private lastDay = today();
   private reminded = new Set<string>();
   private statusEl: HTMLElement | null = null;
@@ -29,7 +27,6 @@ export default class WeekPlannerPlugin extends Plugin {
     this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
     this.store = new Store(this.app, this.settings);
     this.store.device = this.deviceName();
-    this.exporter = new Exporter(this.app, this.store, () => this.settings.exportFolder, () => this.settings.reminderMinutes);
     this.focus = new FocusTimer(this);
 
     this.registerView(VIEW_WEEK, (leaf) => new WeekView(leaf, this));
@@ -99,21 +96,9 @@ export default class WeekPlannerPlugin extends Plugin {
     this.app.workspace.onLayoutReady(async () => {
       await this.store.init();
       await this.dailyMaintenance();
-      this.registerEvent(this.app.vault.on("modify", (f) => {
-        if (!(f instanceof TFile)) return;
-        if (this.exporter.isInbox(f.path)) this.applyInbox();
-        else this.store.onFileModified(f);
-      }));
-      // Keep Planner/Export/planner.json current for the iPhone widget and Reminders.
-      this.registerEvent(this.store.on("changed", () => this.exporter.schedule()));
-      this.exporter.schedule();
-      this.applyInbox();
+      this.registerEvent(this.app.vault.on("modify", (f) => f instanceof TFile && this.store.onFileModified(f)));
       // iCloud may deliver the file after startup; pick it up when it appears.
-      this.registerEvent(this.app.vault.on("create", (f) => {
-        if (!(f instanceof TFile)) return;
-        if (this.exporter.isInbox(f.path)) this.applyInbox();
-        else this.store.onFileModified(f);
-      }));
+      this.registerEvent(this.app.vault.on("create", (f) => f instanceof TFile && this.store.onFileModified(f)));
       this.registerEvent(this.app.metadataCache.on("changed", (f, data) => this.store.onNoteChanged(f.path, data)));
       this.registerEvent(this.app.vault.on("delete", (f) => this.store.onNoteDeleted(f.path)));
       this.registerEvent(this.app.vault.on("rename", (f, old) => {
@@ -196,11 +181,6 @@ export default class WeekPlannerPlugin extends Plugin {
       this.app.saveLocalStorage("wp-device-id", id);
     }
     return `${kind} ${id}`;
-  }
-
-  private async applyInbox() {
-    const n = await this.exporter.readInbox();
-    if (n) new Notice(`Отмечено выполненными из Напоминаний: ${n}`);
   }
 
   openLog() {
