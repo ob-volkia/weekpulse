@@ -12,18 +12,25 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Crect width='7' height='7' fill='%23fbfbfb'/%3E%3Cpath fill='%23103dff' d='M0 3h2v1H0zM2 1h1v3H2zM3 4h1v2H3zM4 2h1v3H4zM5 3h2v1H5z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="preload" href="fonts/MedeoSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  @font-face { font-family: "Medeo Serif"; src: url(fonts/MedeoSerif-Regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Medeo Sans"; src: url(fonts/MedeoSans-Regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "Medeo Sans"; src: url(fonts/MedeoSans-Medium.woff2) format("woff2"); font-weight: 500; font-display: swap; }
+  @font-face { font-family: "Medeo Sans"; src: url(fonts/MedeoSans-SemiBold.woff2) format("woff2"); font-weight: 600; font-display: swap; }
   :root {
     --paper: #fbfbfb; --ink: #000; --blue: #103dff; --ash: #7d7d7d; --schematic: #0043ff;
     --peri: #97acff; --corn: #b6c8ff; --ice: #e6ebff; --mist: #f4f5f9; --hair: #e1e1e1; --white: #fff;
-    --serif: "EB Garamond", Garamond, "Times New Roman", serif;
-    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    --serif: "Medeo Serif", Georgia, serif;
+    --sans: "Medeo Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
     --side: 72px;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; background: var(--paper); }
-  body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--serif); font-feature-settings: "calt"; }
+  b, strong { font-family: var(--sans); font-weight: 600; font-size: .95em; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.65 var(--serif); font-feature-settings: "calt"; }
   a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
   a:hover { color: var(--blue); }
   .page { max-width: 1240px; margin: 0 auto; padding: 0 var(--side); }
@@ -34,6 +41,7 @@
   .mast { min-height: 128px; display: flex; align-items: center; justify-content: space-between; gap: 32px; padding: 28px 0 20px; }
   .wordmark { height: 44px; width: auto; color: var(--blue); display: block; }
   .mast .lede { text-align: right; font-size: 18px; line-height: 1.6; }
+  .mast .lede { font-family: var(--sans); }
   .mast .lede b { font-weight: 500; }
 
   /* glyph divider */
@@ -45,7 +53,7 @@
   /* opening spread */
   .spread { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; align-items: start; padding: 72px 0 120px; }
   .prose p { margin: 0 0 22px; text-align: justify; hyphens: auto; }
-  .prose p.first::first-letter { float: left; font-size: 3.55em; line-height: .82; padding: 6px 8px 0 0; font-weight: 500; color: var(--blue); }
+  .prose p.first::first-letter { float: left; font-size: 3.4em; line-height: .84; padding: 6px 8px 0 0; font-weight: 400; color: var(--blue); }
   .eyebrow { font-family: var(--mono); text-transform: uppercase; font-size: 13px; line-height: 20px; margin: 0 0 18px; }
   .eyebrow .n { color: var(--blue); }
 
@@ -59,11 +67,11 @@
   .lbl { font-family: var(--mono); font-size: 11px; fill: var(--blue); text-transform: uppercase; letter-spacing: 0; }
   .lbl.ash { fill: var(--ash); }
   figcaption { font-family: var(--mono); font-size: 11px; line-height: 16px; color: var(--ash); text-transform: uppercase; margin-top: 10px; }
-  figcaption b { color: var(--ink); font-weight: 400; }
+  figcaption b { color: var(--ink); font-weight: 400; font-family: var(--mono); font-size: inherit; }
 
   /* ruled header */
   .ruled { display: flex; align-items: baseline; gap: 16px; margin: 0 0 40px; }
-  .ruled h2 { font: 500 22px/1.3 var(--serif); margin: 0; flex: none; }
+  .ruled h2 { font: 500 22px/1.3 var(--sans); letter-spacing: -.01em; margin: 0; flex: none; }
   .ruled .rule { flex: 1; border-top: 1px solid var(--ink); transform: translateY(-5px); }
   .ruled .meta { font-family: var(--mono); font-size: 12px; text-transform: uppercase; flex: none; }
   .ruled .meta b { color: var(--blue); font-weight: 400; }
