@@ -8,7 +8,8 @@ export const HOUR_PX = 56;
 export const MIN_BLOCK_PX = 46; // a block always fits the title and one line of details
 export const STALE_AT = 5;
 
-export type Mode = "week" | "month" | "timeline";
+export type Mode = "days3" | "week" | "month" | "timeline";
+export const DAYS3 = 3;
 
 export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

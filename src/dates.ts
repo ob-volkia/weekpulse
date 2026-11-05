@@ -74,9 +74,9 @@ export function humanDay(s: DateStr): string {
 }
 
 /** "3–9 ноября 2026" or "28 октября – 3 ноября 2026" */
-export function weekLabel(start: DateStr): string {
+export function weekLabel(start: DateStr, days = 7): string {
   const a = parse(start);
-  const b = parse(addDays(start, 6));
+  const b = parse(addDays(start, days - 1));
   if (a.getMonth() === b.getMonth()) return `${a.getDate()}–${b.getDate()} ${MONTH_GEN[b.getMonth()]} ${b.getFullYear()}`;
   return `${a.getDate()} ${MONTH_GEN[a.getMonth()]} – ${b.getDate()} ${MONTH_GEN[b.getMonth()]} ${b.getFullYear()}`;
 }

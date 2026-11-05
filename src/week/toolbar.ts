@@ -100,17 +100,19 @@ export function renderToolbar(v: WeekView, root: HTMLElement, mode: Mode) {
 
   const nav = bar.createDiv("wp-nav");
   const month = mode === "month";
-  arrow(v, nav, -1, month ? "Прошлый месяц ([)" : "Прошлая неделя ([)", !month);
+  const d3 = mode === "days3";
+  arrow(v, nav, -1, month ? "Прошлый месяц ([)" : d3 ? "На 3 дня назад ([)" : "Прошлая неделя ([)", !month);
   nav.createEl("button", { text: "Сегодня", cls: "wp-today-btn" }).onclick = () => v.goToday();
-  arrow(v, nav, 1, month ? "Следующий месяц (])" : "Следующая неделя (])", !month);
+  arrow(v, nav, 1, month ? "Следующий месяц (])" : d3 ? "На 3 дня вперёд (])" : "Следующая неделя (])", !month);
   const title = nav.createDiv("wp-week-title");
   if (month) {
     const a = parse(v.monthAnchor());
     title.setText(`${MONTH_NOM[a.getMonth()]} ${a.getFullYear()}`);
-  } else title.setText(weekLabel(v.weekStart));
+  } else if (d3) title.setText(weekLabel(v.dayStart, 3));
+  else title.setText(weekLabel(v.weekStart));
 
   const seg = bar.createDiv("wp-segmented wp-mode");
-  const modes: [Mode, string, string][] = [["week", "Неделя", "w"], ["month", "Месяц", "m"], ["timeline", "Шкала", "l"]];
+  const modes: [Mode, string, string][] = [["days3", "3 дня", "3"], ["week", "Неделя", "w"], ["month", "Месяц", "m"], ["timeline", "Шкала", "l"]];
   for (const [m, label, key] of modes) {
     const b = seg.createEl("button", { text: label, cls: "wp-seg-btn", attr: { "aria-label": `${label} (${key})` } });
     if (mode === m) b.addClass("is-active");

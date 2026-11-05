@@ -31,7 +31,8 @@ export function renderQuickAdd(v: WeekView, parent: HTMLElement, day: DateStr | 
 export function renderDesktop(v: WeekView, root: HTMLElement) {
   const grid = root.createDiv({ cls: "wp-grid wp-scroll-x", attr: { "data-scroll-key": "grid" } });
   renderColumn(v, grid, null);
-  for (const d of weekDays(v.weekStart)) renderColumn(v, grid, d);
+  const days = v.mode === "days3" ? [0, 1, 2].map((i) => addDays(v.dayStart, i)) : weekDays(v.weekStart);
+  for (const d of days) renderColumn(v, grid, d);
 }
 
 export function colClasses(v: WeekView, col: HTMLElement, day: DateStr | null) {

@@ -1,12 +1,12 @@
 import { ItemView, Notice, Platform, TFile, WorkspaceLeaf } from "obsidian";
-import { DateStr, addDays, addMonths, humanDay, startOfWeek, today } from "./dates";
+import { DateStr, addDays, addMonths, diffDays, humanDay, startOfWeek, today } from "./dates";
 import { DragController, DropInfo } from "./drag";
 import { PRIORITY_LABEL, Priority, Task, compareInDay, displayTitle } from "./model";
 import { CalEvent } from "./ics";
 import { SavedFilter } from "./store";
 import { TaskModal } from "./modal";
 import type WeekPlannerPlugin from "./main";
-import { BACKLOG, MOBILE_BREAKPOINT, HOUR_PX, STALE_AT, Mode, tagColor, toHHMM } from "./week/shared";
+import { BACKLOG, DAYS3, MOBILE_BREAKPOINT, HOUR_PX, STALE_AT, Mode, tagColor, toHHMM } from "./week/shared";
 import { updateFocusBadge } from "./week/card";
 import { renderTimeline, renderMobileTimeline, showTimeIndicator } from "./week/timeline";
 import { renderMonth } from "./week/month";
@@ -17,12 +17,14 @@ import { renderDesktop, renderSelectionBar } from "./week/columns";
 
 export { STALE_AT, tagColor };
 export const VIEW_WEEK = "week-planner-view";
+const MODE_KEY = "wp-mode";
 
 /** The week screen: holds view state and data helpers; rendering lives in ./week/*. */
 export class WeekView extends ItemView {
   weekStart: DateStr = startOfWeek(today());
   selected: DateStr = today(); // mobile: which day is shown
   mode: Mode = "week";
+  dayStart: DateStr = today(); // first column of the 3-day view
   filter: SavedFilter = { name: "", tag: null, minPriority: null, goal: null };
   selection = new Set<string>();
   cursor: string | null = null; // keyboard-selected task (desktop)
@@ -49,6 +51,8 @@ export class WeekView extends ItemView {
 
   async onOpen() {
     this.contentEl.addClass("wp-root");
+    const saved = this.app.loadLocalStorage(MODE_KEY) as Mode | null;
+    if (saved && ["days3", "week", "month", "timeline"].includes(saved)) this.mode = saved;
     this.registerEvent(this.store.on("changed", () => this.render()));
     this.registerEvent(this.plugin.focus.on("tick", () => updateFocusBadge(this)));
     this.drag = new DragController(this.contentEl, {
@@ -90,12 +94,14 @@ export class WeekView extends ItemView {
   goToday() {
     this.weekStart = startOfWeek(today());
     this.selected = today();
+    this.dayStart = today();
     this.render();
   }
 
   showWeekOf(day: DateStr) {
     this.weekStart = startOfWeek(day);
     this.selected = day;
+    this.dayStart = day;
     if (this.mode === "month") this.mode = "week";
     this.render();
   }
@@ -105,12 +111,21 @@ export class WeekView extends ItemView {
   }
 
   setMode(m: Mode) {
+    if (m === "days3" && this.mode !== "days3") {
+      // Start on today when it is in the shown week, else on the week's Monday.
+      const off = diffDays(today(), this.weekStart);
+      this.dayStart = off >= 0 && off < 7 ? today() : this.weekStart;
+    }
     this.mode = m;
+    this.app.saveLocalStorage(MODE_KEY, m);
     this.render();
   }
 
   shift(n: number) {
-    if (this.mode === "month") {
+    if (this.mode === "days3" && !this.mobile) {
+      this.dayStart = addDays(this.dayStart, DAYS3 * n);
+      this.weekStart = startOfWeek(this.dayStart);
+    } else if (this.mode === "month") {
       const anchor = addMonths(this.monthAnchor(), n);
       this.weekStart = startOfWeek(anchor);
     } else {
@@ -156,6 +171,7 @@ export class WeekView extends ItemView {
     else if (k === "[" || k === "х" || (k === "ArrowLeft" && e.altKey)) this.shift(-1);
     else if (k === "]" || k === "ъ" || (k === "ArrowRight" && e.altKey)) this.shift(1);
     else if (k === "d" || k === "в") this.toggleDone();
+    else if (k === "3") this.setMode("days3");
     else if (k === "w" || k === "ц") this.setMode("week");
     else if (k === "m" || k === "ь") this.setMode("month");
     else if (k === "l" || k === "д") this.setMode("timeline");
@@ -254,7 +270,8 @@ export class WeekView extends ItemView {
     if (!t) return;
     if (target === "week-prev" || target === "week-next") {
       const base = this.store.effectiveDue(t) ?? today();
-      const to = addDays(base, target === "week-next" ? 7 : -7);
+      const step = this.mode === "days3" && !this.mobile ? DAYS3 : 7;
+      const to = addDays(base, target === "week-next" ? step : -step);
       this.store.move(id, to, null);
       new Notice(`«${displayTitle(t)}» → ${humanDay(to)}`);
       return;
@@ -287,7 +304,9 @@ export class WeekView extends ItemView {
     const scroll = this.saveScroll();
     root.empty();
     this.timeIndicator = null;
-    const mode = this.mode;
+    // The phone always shows one day, so the 3-day view falls back to the week there.
+    const mode: Mode = this.mobile && this.mode === "days3" ? "week" : this.mode;
+    if (mode === "days3") this.weekStart = startOfWeek(this.dayStart);
     root.toggleClass("is-mobile", this.mobile);
     root.toggleClass("is-compact", this.compact);
     root.dataset.mode = mode;

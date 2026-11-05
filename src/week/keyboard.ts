@@ -1,6 +1,6 @@
 // Keyboard cursor on the desktop week and timeline.
 
-import { addDays, today, weekday } from "../dates";
+import { addDays, diffDays, today, weekday } from "../dates";
 import type { WeekView } from "../weekView";
 import { openTask } from "./card";
 import { arrow } from "./toolbar";
@@ -43,7 +43,7 @@ export function cursorKey(v: WeekView, e: KeyboardEvent): boolean {
     const p = pos();
     if (!p) {
       // Start on today's column if it has tasks, else the first task anywhere.
-      const todayIdx = v.mode === "timeline" ? weekday(today()) - 1 : weekday(today());
+      const todayIdx = v.mode === "timeline" ? weekday(today()) - 1 : v.mode === "days3" ? diffDays(today(), v.dayStart) + 1 : weekday(today());
       set(cols[todayIdx]?.[0] ?? cols.find((c) => c.length)?.[0]);
       return;
     }
