@@ -13,6 +13,7 @@ import { renderMonth } from "./week/month";
 import { renderMobile } from "./week/mobile";
 import { renderToolbar } from "./week/toolbar";
 import { applyCursor, cursorKey } from "./week/keyboard";
+import { setupPenHover } from "./week/penHover";
 import { renderDesktop, renderSelectionBar } from "./week/columns";
 
 export { STALE_AT, tagColor };
@@ -37,6 +38,7 @@ export class WeekView extends ItemView {
   focusKey: string | null = null;
   resizeObs: ResizeObserver | null = null;
   timeIndicator: HTMLElement | null = null;
+  hidePeek: (() => void) | null = null;
 
   constructor(leaf: WorkspaceLeaf, public plugin: WeekPlannerPlugin) {
     super(leaf);
@@ -71,7 +73,23 @@ export class WeekView extends ItemView {
           new Notice(`«${displayTitle(t)}» перенесена на завтра`);
         }
       },
+      onStrike: (id) => {
+        const t = this.store.find(id);
+        if (!t) return;
+        this.store.toggle(id);
+        new Notice(t.done ? `«${displayTitle(t)}» снова в работе` : `Выполнено: ${displayTitle(t)}`);
+      },
+      drawRange: (el, y1, y2) => {
+        const [a, b] = this.drawnMinutes(el, y1, y2);
+        const start = this.settings.timelineStart * 60;
+        return { top: ((a - start) / 60) * HOUR_PX, height: ((b - a) / 60) * HOUR_PX - 2, label: `${toHHMM(a)}–${toHHMM(b)}` };
+      },
+      onDrawBlock: (el, y1, y2) => {
+        const [a, b] = this.drawnMinutes(el, y1, y2);
+        new TaskModal(this.app, this.plugin, null, el.dataset.drop ?? today(), { time: toHHMM(a), duration: b - a }).open();
+      },
     });
+    this.hidePeek = setupPenHover(this);
     this.resizeObs = new ResizeObserver(() => {
       const m = Platform.isPhone || this.contentEl.clientWidth < MOBILE_BREAKPOINT;
       if (m !== this.mobile) {
@@ -262,6 +280,17 @@ export class WeekView extends ItemView {
     }, 650);
   }
 
+  /** Start and end minutes of a block drawn between client Y y1 and y2 on a timeline column, 15-minute steps. */
+  drawnMinutes(el: HTMLElement, y1: number, y2: number): [number, number] {
+    const rect = el.getBoundingClientRect();
+    const lo = this.settings.timelineStart * 60;
+    const hi = this.settings.timelineEnd * 60;
+    const at = (y: number) => lo + Math.round(((y - rect.top) / HOUR_PX) * 4) * 15;
+    const a = Math.max(lo, Math.min(hi - 15, at(y1)));
+    const b = Math.max(a + 15, Math.min(hi, at(y2)));
+    return [a, b];
+  }
+
   onDrop(id: string, target: string, before: string | null, info: DropInfo) {
     if (this.flipTimer) window.clearTimeout(this.flipTimer);
     this.flipTimer = null;
@@ -301,6 +330,7 @@ export class WeekView extends ItemView {
 
   render() {
     const root = this.contentEl;
+    this.hidePeek?.();
     const scroll = this.saveScroll();
     root.empty();
     this.timeIndicator = null;
