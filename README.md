@@ -4,6 +4,8 @@
 
 Интерфейс на русском.
 
+**[Скачать красивую PDF-инструкцию со скриншотами](https://github.com/ob-volkia/weekpulse/releases/latest/download/Weekpulse-guide.pdf)** — то же самое, что ниже, удобно переслать коллегам.
+
 ---
 
 ## Содержание
