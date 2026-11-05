@@ -3,34 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#1e1e1e">
 <title>Weekpulse — установка</title>
 <meta name="description" content="Недельный планер для Obsidian. Установка за пять минут: iCloud, BRAT, готово.">
 <meta property="og:title" content="Weekpulse — недельный планер для Obsidian">
 <meta property="og:description" content="Установка за пять минут: iCloud, BRAT, готово.">
 <meta property="og:image" content="img/week.png">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Crect width='7' height='7' fill='%23fbfbfb'/%3E%3Cpath fill='%23103dff' d='M0 3h2v1H0zM2 1h1v3H2zM3 4h1v2H3zM4 2h1v3H4zM5 3h2v1H5z'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 7' shape-rendering='crispEdges'%3E%3Crect width='7' height='7' fill='%231e1e1e'/%3E%3Cpath fill='%237f6df2' d='M0 3h2v1H0zM2 1h1v3H2zM3 4h1v2H3zM4 2h1v3H4zM5 3h2v1H5z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/medeo-font@1.0.0/dist/sans.css">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="preload" href="fonts/MedeoSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
 <style>
-  @font-face { font-family: "Medeo Serif"; src: url(fonts/MedeoSerif-Regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
-  @font-face { font-family: "Medeo Sans"; src: url(fonts/MedeoSans-Regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
-  @font-face { font-family: "Medeo Sans"; src: url(fonts/MedeoSans-Medium.woff2) format("woff2"); font-weight: 500; font-display: swap; }
-  @font-face { font-family: "Medeo Sans"; src: url(fonts/MedeoSans-SemiBold.woff2) format("woff2"); font-weight: 600; font-display: swap; }
   :root {
-    --paper: #fbfbfb; --ink: #000; --blue: #103dff; --ash: #7d7d7d; --schematic: #0043ff;
-    --peri: #97acff; --corn: #b6c8ff; --ice: #e6ebff; --mist: #f4f5f9; --hair: #e1e1e1; --white: #fff;
-    --serif: "Medeo Serif", Georgia, serif;
+    /* Obsidian default dark */
+    --paper: #1e1e1e; --ink: #dadada; --blue: #a68af9; --ash: #8a8a8a; --schematic: #9d8cf8;
+    --peri: #6a5bc9; --corn: #3a3550; --ice: #2c2843; --mist: #232323; --hair: #363636; --white: #2a2a2a;
+    --accent: #7f6df2; --raised: #262626;
     --sans: "Medeo Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --serif: var(--sans);
     --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
     --side: 72px;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; background: var(--paper); }
-  b, strong { font-family: var(--sans); font-weight: 600; font-size: .95em; }
-  body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.65 var(--serif); font-feature-settings: "calt"; }
+  b, strong { font-weight: 600; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.7 var(--sans); font-feature-settings: "calt"; }
   a { color: inherit; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
   a:hover { color: var(--blue); }
   .page { max-width: 1240px; margin: 0 auto; padding: 0 var(--side); }
@@ -52,8 +51,8 @@
 
   /* opening spread */
   .spread { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 64px; align-items: start; padding: 72px 0 120px; }
-  .prose p { margin: 0 0 22px; text-align: justify; hyphens: auto; }
-  .prose p.first::first-letter { float: left; font-size: 3.4em; line-height: .84; padding: 6px 8px 0 0; font-weight: 400; color: var(--blue); }
+  .prose p { margin: 0 0 22px; }
+  .prose p.first::first-letter { float: left; font-size: 3.4em; line-height: .84; padding: 5px 9px 0 0; font-weight: 600; color: var(--blue); }
   .eyebrow { font-family: var(--mono); text-transform: uppercase; font-size: 13px; line-height: 20px; margin: 0 0 18px; }
   .eyebrow .n { color: var(--blue); }
 
@@ -93,15 +92,18 @@
 
   /* bevelled key button */
   .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0 14px; }
-  .key { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 0 12px; border-radius: 4px; border: 1px solid rgba(0,0,0,.5); background: rgba(255,255,255,.5); color: var(--ink); font: 400 12px/16px var(--mono); text-transform: uppercase; text-decoration: none; cursor: pointer; box-shadow: rgba(255,255,255,.75) 1px 1px 0 2px inset, rgba(0,0,0,.1) -1px -1px 0 2px inset; -webkit-tap-highlight-color: transparent; }
-  .key:hover { color: var(--blue); border-color: var(--blue); }
-  .key:active { box-shadow: rgba(0,0,0,.1) 1px 1px 0 2px inset, rgba(255,255,255,.75) -1px -1px 0 2px inset; transform: translateY(1px); }
+  .key { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 0 12px; border-radius: 4px; border: 1px solid #4a4a4a; background: var(--raised); color: var(--ink); font: 400 12px/16px var(--mono); text-transform: uppercase; text-decoration: none; cursor: pointer; box-shadow: rgba(255,255,255,.06) 1px 1px 0 2px inset, rgba(0,0,0,.35) -1px -1px 0 2px inset; -webkit-tap-highlight-color: transparent; }
+  .key:hover { color: var(--blue); border-color: var(--accent); }
+  .key.cta { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: rgba(255,255,255,.18) 1px 1px 0 2px inset, rgba(0,0,0,.25) -1px -1px 0 2px inset; }
+  .key.cta .arr { color: #fff; }
+  .key.cta:hover { color: #fff; filter: brightness(1.08); }
+  .key:active { box-shadow: rgba(0,0,0,.35) 1px 1px 0 2px inset, rgba(255,255,255,.06) -1px -1px 0 2px inset; transform: translateY(1px); }
   .key .arr { color: var(--blue); }
 
   /* copy field */
-  .copy { display: flex; align-items: stretch; border: 1px solid rgba(0,0,0,.5); border-radius: 4px; overflow: hidden; margin: 8px 0 12px; max-width: 420px; background: var(--white); }
-  .copy code { flex: 1; min-width: 0; font: 500 15px/1 var(--mono); color: var(--blue); padding: 11px 12px; overflow-x: auto; white-space: nowrap; background-image: radial-gradient(var(--ice) 1px, transparent 1.2px); background-size: 8px 8px; }
-  .copy .key { border: 0; border-left: 1px solid rgba(0,0,0,.5); border-radius: 0; min-width: 118px; }
+  .copy { display: flex; align-items: stretch; border: 1px solid #4a4a4a; border-radius: 4px; overflow: hidden; margin: 8px 0 12px; max-width: 420px; background: var(--paper); }
+  .copy code { flex: 1; min-width: 0; font: 500 15px/1 var(--mono); color: var(--blue); padding: 11px 12px; overflow-x: auto; white-space: nowrap; background-image: radial-gradient(#2e2e2e 1px, transparent 1.2px); background-size: 8px 8px; }
+  .copy .key { border: 0; border-left: 1px solid #4a4a4a; border-radius: 0; min-width: 118px; }
   .copy .key.done { color: var(--blue); }
 
   details.manual { margin: 4px 0 12px; }
@@ -113,7 +115,7 @@
 
   .callout { border-top: 1px solid var(--ink); border-bottom: 1px solid var(--hair); padding: 14px 0; margin: 48px 0 0; display: grid; grid-template-columns: 120px 1fr; gap: 16px; }
   .callout .mono { font-size: 12px; line-height: 22px; color: var(--blue); }
-  .callout.danger .mono { color: var(--ink); }
+  .callout.danger .mono { color: #fb464c; }
   .callout p { margin: 0; }
 
   /* index list */
@@ -127,9 +129,8 @@
   .index li .w { font-family: var(--mono); font-size: 10.5px; color: var(--ash); text-transform: uppercase; }
 
   /* plate (screenshot as blueprint) */
-  .plate { position: relative; overflow: hidden; background: var(--white); border: 1px solid var(--hair); }
-  .plate img { display: block; width: 100%; height: auto; filter: invert(1) grayscale(1) contrast(1.25) brightness(1.04); }
-  .plate::after { content: ""; position: absolute; inset: 0; background: var(--blue); mix-blend-mode: screen; pointer-events: none; }
+  .plate { position: relative; overflow: hidden; background: #1e1e1e; border: 1px solid var(--hair); border-radius: 6px; }
+  .plate img { display: block; width: 100%; height: auto; }
   .plates { display: grid; grid-template-columns: 7fr 3fr; gap: 40px; align-items: start; margin-top: 56px; }
   .plates .phone-plate { max-width: 280px; justify-self: end; width: 100%; }
 
@@ -141,7 +142,7 @@
   .syntax tr:first-child td { border-top: 1px solid var(--ink); }
 
   /* IN/OUT FAQ */
-  .faq { border: 1px solid rgba(0,0,0,.102); border-radius: 4px; background: var(--paper); display: grid; grid-template-columns: 1fr 1fr; }
+  .faq { border: 1px solid var(--hair); border-radius: 4px; background: #202020; display: grid; grid-template-columns: 1fr 1fr; }
   .faq .qa { padding: 20px 22px; border-bottom: 1px solid var(--hair); }
   .faq .qa:nth-child(odd) { border-right: 1px solid var(--hair); }
   .faq .qa:nth-last-child(-n+2) { border-bottom: 0; }
@@ -157,8 +158,8 @@
   footer .line a { text-decoration: none; }
   footer .line a:hover { color: var(--blue); }
   .dither { height: 64px; margin-top: 96px; background-image:
-      radial-gradient(#7d7d7d 1px, transparent 1.3px),
-      linear-gradient(to bottom, transparent, rgba(125,125,125,.18));
+      radial-gradient(#4a4a4a 1px, transparent 1.3px),
+      linear-gradient(to bottom, transparent, rgba(127,109,242,.08));
     background-size: 4px 4px, 100% 100%;
     -webkit-mask-image: linear-gradient(to bottom, transparent, #000);
             mask-image: linear-gradient(to bottom, transparent, #000); }
@@ -231,64 +232,64 @@
         <span class="tag-l">FIG_001</span><span class="tag-r">[ день на iPhone ]</span>
         <svg viewBox="0 0 560 520" aria-label="Схема экрана Weekpulse на iPhone">
           <defs>
-            <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 8 4 0 8z" fill="#0043ff"/></marker>
-            <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#97acff" stroke-width="1.4"/></pattern>
+            <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 8 4 0 8z" fill="#9d8cf8"/></marker>
+            <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#6a5bc9" stroke-width="1.4"/></pattern>
           </defs>
           <!-- body depth -->
-          <path d="M196 36 h176 a30 30 0 0 1 30 30 v384 a30 30 0 0 1 -30 30 h-176 a30 30 0 0 1 -30 -30 v-384 a30 30 0 0 1 30 -30z" transform="translate(16 12)" fill="url(#hatch)" stroke="#0043ff" stroke-width="1.2"/>
-          <path d="M196 36 h176 a30 30 0 0 1 30 30 v384 a30 30 0 0 1 -30 30 h-176 a30 30 0 0 1 -30 -30 v-384 a30 30 0 0 1 30 -30z" fill="#fff" stroke="#0043ff" stroke-width="1.4"/>
-          <rect x="180" y="52" width="208" height="412" rx="20" fill="#f4f5f9" stroke="#0043ff" stroke-width="1"/>
-          <rect x="250" y="60" width="68" height="14" rx="7" fill="#0043ff"/>
+          <path d="M196 36 h176 a30 30 0 0 1 30 30 v384 a30 30 0 0 1 -30 30 h-176 a30 30 0 0 1 -30 -30 v-384 a30 30 0 0 1 30 -30z" transform="translate(16 12)" fill="url(#hatch)" stroke="#9d8cf8" stroke-width="1.2"/>
+          <path d="M196 36 h176 a30 30 0 0 1 30 30 v384 a30 30 0 0 1 -30 30 h-176 a30 30 0 0 1 -30 -30 v-384 a30 30 0 0 1 30 -30z" fill="#2a2a2a" stroke="#9d8cf8" stroke-width="1.4"/>
+          <rect x="180" y="52" width="208" height="412" rx="20" fill="#232323" stroke="#9d8cf8" stroke-width="1"/>
+          <rect x="250" y="60" width="68" height="14" rx="7" fill="#9d8cf8"/>
           <!-- toolbar -->
-          <rect x="194" y="86" width="44" height="12" rx="2" fill="#e6ebff" stroke="#0043ff" stroke-width=".8"/>
-          <rect x="330" y="88" width="44" height="8" rx="1" fill="#b6c8ff"/>
+          <rect x="194" y="86" width="44" height="12" rx="2" fill="#2c2843" stroke="#9d8cf8" stroke-width=".8"/>
+          <rect x="330" y="88" width="44" height="8" rx="1" fill="#463d73"/>
           <!-- week strip -->
-          <g stroke="#0043ff" stroke-width=".8">
-            <rect x="194" y="108" width="22" height="30" rx="3" fill="#fff"/><rect x="220" y="108" width="22" height="30" rx="3" fill="#fff"/>
-            <rect x="246" y="108" width="22" height="30" rx="3" fill="#fff"/><rect x="272" y="108" width="22" height="30" rx="3" fill="#0043ff"/>
-            <rect x="298" y="108" width="22" height="30" rx="3" fill="#fff"/><rect x="324" y="108" width="22" height="30" rx="3" fill="#fff"/>
-            <rect x="350" y="108" width="22" height="30" rx="3" fill="#e6ebff"/>
+          <g stroke="#9d8cf8" stroke-width=".8">
+            <rect x="194" y="108" width="22" height="30" rx="3" fill="#2a2a2a"/><rect x="220" y="108" width="22" height="30" rx="3" fill="#2a2a2a"/>
+            <rect x="246" y="108" width="22" height="30" rx="3" fill="#2a2a2a"/><rect x="272" y="108" width="22" height="30" rx="3" fill="#9d8cf8"/>
+            <rect x="298" y="108" width="22" height="30" rx="3" fill="#2a2a2a"/><rect x="324" y="108" width="22" height="30" rx="3" fill="#2a2a2a"/>
+            <rect x="350" y="108" width="22" height="30" rx="3" fill="#2c2843"/>
           </g>
-          <g fill="#97acff"><rect x="200" y="116" width="10" height="3"/><rect x="226" y="116" width="10" height="3"/><rect x="252" y="116" width="10" height="3"/><rect x="304" y="116" width="10" height="3"/><rect x="330" y="116" width="10" height="3"/><rect x="356" y="116" width="10" height="3"/></g>
-          <rect x="278" y="116" width="10" height="3" fill="#fff"/><rect x="278" y="124" width="10" height="7" fill="#fff"/>
+          <g fill="#6a5bc9"><rect x="200" y="116" width="10" height="3"/><rect x="226" y="116" width="10" height="3"/><rect x="252" y="116" width="10" height="3"/><rect x="304" y="116" width="10" height="3"/><rect x="330" y="116" width="10" height="3"/><rect x="356" y="116" width="10" height="3"/></g>
+          <rect x="278" y="116" width="10" height="3" fill="#2a2a2a"/><rect x="278" y="124" width="10" height="7" fill="#2a2a2a"/>
           <!-- day title -->
-          <rect x="194" y="152" width="96" height="10" rx="1" fill="#0043ff"/>
-          <rect x="330" y="154" width="44" height="6" rx="1" fill="#b6c8ff"/>
+          <rect x="194" y="152" width="96" height="10" rx="1" fill="#9d8cf8"/>
+          <rect x="330" y="154" width="44" height="6" rx="1" fill="#463d73"/>
           <!-- event -->
-          <rect x="194" y="174" width="180" height="22" rx="3" fill="#e6ebff" stroke="#0043ff" stroke-width=".8"/>
-          <rect x="194" y="174" width="3" height="22" fill="#0043ff"/>
-          <rect x="204" y="182" width="64" height="6" fill="#97acff"/>
+          <rect x="194" y="174" width="180" height="22" rx="3" fill="#2c2843" stroke="#9d8cf8" stroke-width=".8"/>
+          <rect x="194" y="174" width="3" height="22" fill="#9d8cf8"/>
+          <rect x="204" y="182" width="64" height="6" fill="#6a5bc9"/>
           <!-- cards -->
           <g>
-            <rect x="194" y="206" width="180" height="40" rx="4" fill="#fff" stroke="#0043ff" stroke-width=".9"/>
-            <rect x="204" y="216" width="12" height="12" rx="2" fill="#fff" stroke="#0043ff"/>
-            <rect x="224" y="217" width="92" height="7" fill="#0043ff"/><rect x="224" y="231" width="48" height="5" fill="#b6c8ff"/>
+            <rect x="194" y="206" width="180" height="40" rx="4" fill="#2a2a2a" stroke="#9d8cf8" stroke-width=".9"/>
+            <rect x="204" y="216" width="12" height="12" rx="2" fill="#2a2a2a" stroke="#9d8cf8"/>
+            <rect x="224" y="217" width="92" height="7" fill="#9d8cf8"/><rect x="224" y="231" width="48" height="5" fill="#463d73"/>
           </g>
           <!-- swiped card -->
           <g>
-            <rect x="194" y="256" width="180" height="40" rx="4" fill="#e6ebff" stroke="#0043ff" stroke-width=".9" stroke-dasharray="3 3"/>
-            <rect x="238" y="256" width="180" height="40" rx="4" fill="#fff" stroke="#0043ff" stroke-width="1.2"/>
-            <rect x="248" y="266" width="12" height="12" rx="2" fill="#fff" stroke="#0043ff"/>
-            <rect x="268" y="267" width="110" height="7" fill="#0043ff"/><rect x="268" y="281" width="60" height="5" fill="#b6c8ff"/>
+            <rect x="194" y="256" width="180" height="40" rx="4" fill="#2c2843" stroke="#9d8cf8" stroke-width=".9" stroke-dasharray="3 3"/>
+            <rect x="238" y="256" width="180" height="40" rx="4" fill="#2a2a2a" stroke="#9d8cf8" stroke-width="1.2"/>
+            <rect x="248" y="266" width="12" height="12" rx="2" fill="#2a2a2a" stroke="#9d8cf8"/>
+            <rect x="268" y="267" width="110" height="7" fill="#9d8cf8"/><rect x="268" y="281" width="60" height="5" fill="#463d73"/>
           </g>
           <g>
-            <rect x="194" y="306" width="180" height="40" rx="4" fill="#fff" stroke="#0043ff" stroke-width=".9"/>
-            <rect x="204" y="316" width="12" height="12" rx="2" fill="#0043ff"/>
+            <rect x="194" y="306" width="180" height="40" rx="4" fill="#2a2a2a" stroke="#9d8cf8" stroke-width=".9"/>
+            <rect x="204" y="316" width="12" height="12" rx="2" fill="#9d8cf8"/>
             <path d="M206.5 322 l3 3 5-6" fill="none" stroke="#fff" stroke-width="1.6"/>
-            <rect x="224" y="317" width="70" height="7" fill="#97acff"/><rect x="224" y="331" width="40" height="5" fill="#e6ebff"/>
+            <rect x="224" y="317" width="70" height="7" fill="#6a5bc9"/><rect x="224" y="331" width="40" height="5" fill="#2c2843"/>
           </g>
           <g>
-            <rect x="194" y="356" width="180" height="40" rx="4" fill="#fff" stroke="#0043ff" stroke-width=".9" stroke-dasharray="2 2"/>
-            <rect x="204" y="366" width="12" height="12" rx="2" fill="#fff" stroke="#0043ff"/>
-            <rect x="224" y="367" width="80" height="7" fill="#0043ff"/><rect x="224" y="381" width="56" height="5" fill="#b6c8ff"/>
+            <rect x="194" y="356" width="180" height="40" rx="4" fill="#2a2a2a" stroke="#9d8cf8" stroke-width=".9" stroke-dasharray="2 2"/>
+            <rect x="204" y="366" width="12" height="12" rx="2" fill="#2a2a2a" stroke="#9d8cf8"/>
+            <rect x="224" y="367" width="80" height="7" fill="#9d8cf8"/><rect x="224" y="381" width="56" height="5" fill="#463d73"/>
           </g>
           <!-- navbar plus -->
-          <line x1="180" y1="424" x2="388" y2="424" stroke="#0043ff" stroke-width=".8"/>
-          <g fill="#b6c8ff"><rect x="204" y="436" width="14" height="14" rx="3"/><rect x="242" y="436" width="14" height="14" rx="3"/><rect x="312" y="436" width="14" height="14" rx="3"/><rect x="350" y="436" width="14" height="14" rx="3"/></g>
-          <circle cx="284" cy="443" r="11" fill="#0043ff"/><path d="M284 437 v12 M278 443 h12" stroke="#fff" stroke-width="2"/>
+          <line x1="180" y1="424" x2="388" y2="424" stroke="#9d8cf8" stroke-width=".8"/>
+          <g fill="#463d73"><rect x="204" y="436" width="14" height="14" rx="3"/><rect x="242" y="436" width="14" height="14" rx="3"/><rect x="312" y="436" width="14" height="14" rx="3"/><rect x="350" y="436" width="14" height="14" rx="3"/></g>
+          <circle cx="284" cy="443" r="11" fill="#9d8cf8"/><path d="M284 437 v12 M278 443 h12" stroke="#fff" stroke-width="2"/>
 
           <!-- callouts -->
-          <g stroke="#0043ff" stroke-width="1" fill="none">
+          <g stroke="#9d8cf8" stroke-width="1" fill="none">
             <path d="M150 123 H190" marker-end="url(#ah)"/>
             <path d="M150 185 H190" marker-end="url(#ah)"/>
             <path d="M420 276 H470" marker-start="url(#ah)" stroke-dasharray="3 3"/>
@@ -324,27 +325,27 @@
       <div class="fig" style="padding:16px 36px">
         <span class="tag-l">FIG_002</span><span class="tag-r">[ схема ]</span>
         <svg viewBox="0 0 900 200" aria-label="Схема: iPhone, iCloud и Mac">
-          <defs><marker id="ah2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 8 4 0 8z" fill="#0043ff"/></marker></defs>
+          <defs><marker id="ah2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 8 4 0 8z" fill="#9d8cf8"/></marker></defs>
           <!-- phone -->
-          <rect x="96" y="44" width="64" height="120" rx="12" fill="url(#hatch)" stroke="#0043ff" transform="translate(7 5)"/>
-          <rect x="96" y="44" width="64" height="120" rx="12" fill="#fff" stroke="#0043ff" stroke-width="1.4"/>
-          <rect x="103" y="54" width="50" height="98" rx="6" fill="#f4f5f9" stroke="#0043ff" stroke-width=".8"/>
-          <g fill="#97acff"><rect x="109" y="64" width="38" height="5"/><rect x="109" y="76" width="38" height="12" fill="#e6ebff" stroke="#0043ff" stroke-width=".6"/><rect x="109" y="94" width="38" height="12" fill="#e6ebff" stroke="#0043ff" stroke-width=".6"/><rect x="109" y="112" width="38" height="12" fill="#e6ebff" stroke="#0043ff" stroke-width=".6"/></g>
+          <rect x="96" y="44" width="64" height="120" rx="12" fill="url(#hatch)" stroke="#9d8cf8" transform="translate(7 5)"/>
+          <rect x="96" y="44" width="64" height="120" rx="12" fill="#2a2a2a" stroke="#9d8cf8" stroke-width="1.4"/>
+          <rect x="103" y="54" width="50" height="98" rx="6" fill="#232323" stroke="#9d8cf8" stroke-width=".8"/>
+          <g fill="#6a5bc9"><rect x="109" y="64" width="38" height="5"/><rect x="109" y="76" width="38" height="12" fill="#2c2843" stroke="#9d8cf8" stroke-width=".6"/><rect x="109" y="94" width="38" height="12" fill="#2c2843" stroke="#9d8cf8" stroke-width=".6"/><rect x="109" y="112" width="38" height="12" fill="#2c2843" stroke="#9d8cf8" stroke-width=".6"/></g>
           <text class="lbl stage" x="128" y="190" text-anchor="middle">01 · iPhone</text>
           <!-- cloud -->
-          <path d="M390 128 h120 a32 32 0 0 0 0 -64 a44 44 0 0 0 -84 -10 a30 30 0 0 0 -36 74z" fill="url(#hatch)" stroke="#0043ff" transform="translate(7 5)"/>
-          <path d="M390 128 h120 a32 32 0 0 0 0 -64 a44 44 0 0 0 -84 -10 a30 30 0 0 0 -36 74z" fill="#e6ebff" stroke="#0043ff" stroke-width="1.4"/>
-          <rect x="426" y="84" width="56" height="30" rx="3" fill="#fff" stroke="#0043ff"/>
-          <path d="M426 92 h20 l4 -6 h32" fill="none" stroke="#0043ff"/>
+          <path d="M390 128 h120 a32 32 0 0 0 0 -64 a44 44 0 0 0 -84 -10 a30 30 0 0 0 -36 74z" fill="url(#hatch)" stroke="#9d8cf8" transform="translate(7 5)"/>
+          <path d="M390 128 h120 a32 32 0 0 0 0 -64 a44 44 0 0 0 -84 -10 a30 30 0 0 0 -36 74z" fill="#2c2843" stroke="#9d8cf8" stroke-width="1.4"/>
+          <rect x="426" y="84" width="56" height="30" rx="3" fill="#2a2a2a" stroke="#9d8cf8"/>
+          <path d="M426 92 h20 l4 -6 h32" fill="none" stroke="#9d8cf8"/>
           <text class="lbl stage" x="452" y="190" text-anchor="middle">iCloud Drive</text>
           <!-- laptop -->
-          <rect x="716" y="52" width="120" height="78" rx="6" fill="#fff" stroke="#0043ff" stroke-width="1.4"/>
-          <rect x="724" y="60" width="104" height="62" fill="#f4f5f9" stroke="#0043ff" stroke-width=".8"/>
-          <g stroke="#0043ff" stroke-width=".6" fill="#e6ebff"><rect x="730" y="68" width="16" height="48"/><rect x="750" y="68" width="16" height="48"/><rect x="770" y="68" width="16" height="48" fill="#0043ff"/><rect x="790" y="68" width="16" height="48"/><rect x="810" y="68" width="12" height="48"/></g>
-          <path d="M700 130 h152 l-10 14 h-132z" fill="#b6c8ff" stroke="#0043ff" stroke-width="1.2"/>
+          <rect x="716" y="52" width="120" height="78" rx="6" fill="#2a2a2a" stroke="#9d8cf8" stroke-width="1.4"/>
+          <rect x="724" y="60" width="104" height="62" fill="#232323" stroke="#9d8cf8" stroke-width=".8"/>
+          <g stroke="#9d8cf8" stroke-width=".6" fill="#2c2843"><rect x="730" y="68" width="16" height="48"/><rect x="750" y="68" width="16" height="48"/><rect x="770" y="68" width="16" height="48" fill="#9d8cf8"/><rect x="790" y="68" width="16" height="48"/><rect x="810" y="68" width="12" height="48"/></g>
+          <path d="M700 130 h152 l-10 14 h-132z" fill="#463d73" stroke="#9d8cf8" stroke-width="1.2"/>
           <text class="lbl stage" x="776" y="190" text-anchor="middle">04 · Mac</text>
           <!-- arrows -->
-          <g stroke="#0043ff" fill="none" stroke-width="1"><path d="M178 96 H360" marker-end="url(#ah2)"/><path d="M548 96 H690" marker-end="url(#ah2)" stroke-dasharray="4 4"/></g>
+          <g stroke="#9d8cf8" fill="none" stroke-width="1"><path d="M178 96 H360" marker-end="url(#ah2)"/><path d="M548 96 H690" marker-end="url(#ah2)" stroke-dasharray="4 4"/></g>
           <text class="mid lbl" x="269" y="84" text-anchor="middle">хранилище + плагин</text>
           <text class="mid lbl ash" x="269" y="114" text-anchor="middle">шаги 01–03</text>
           <text class="mid lbl" x="619" y="84" text-anchor="middle">приедет само</text>
@@ -382,7 +383,7 @@
         <h3><span class="n">03</span>Weekpulse</h3>
         <div class="where">на iPhone</div>
         <p>Кнопка откроет BRAT с уже вписанным адресом плагина — останется нажать <span class="k">Add plugin</span>. Готово, когда на панели появятся значки календаря, таймера и огонька.</p>
-        <div class="actions"><a class="key" href="obsidian://brat?plugin=ob-volkia/weekpulse"><span class="arr">+</span> Установить Weekpulse</a></div>
+        <div class="actions"><a class="key cta" href="obsidian://brat?plugin=ob-volkia/weekpulse"><span class="arr">+</span> Установить Weekpulse</a></div>
         <details class="manual">
           <summary>Вручную, если кнопка не сработала</summary>
           <div>
