@@ -24,7 +24,7 @@ export class WeekView extends ItemView {
   weekStart: DateStr = startOfWeek(today());
   selected: DateStr = today(); // mobile: which day is shown
   mode: Mode = "week";
-  dayStart: DateStr = today(); // first column of the 3-day view
+  dayStart: DateStr = addDays(today(), -1); // first column of the 3-day view: yesterday, today, tomorrow
   filter: SavedFilter = { name: "", tag: null, minPriority: null, goal: null };
   selection = new Set<string>();
   cursor: string | null = null; // keyboard-selected task (desktop)
@@ -94,14 +94,14 @@ export class WeekView extends ItemView {
   goToday() {
     this.weekStart = startOfWeek(today());
     this.selected = today();
-    this.dayStart = today();
+    this.dayStart = addDays(today(), -1);
     this.render();
   }
 
   showWeekOf(day: DateStr) {
     this.weekStart = startOfWeek(day);
     this.selected = day;
-    this.dayStart = day;
+    this.dayStart = addDays(day, -1);
     if (this.mode === "month") this.mode = "week";
     this.render();
   }
@@ -112,9 +112,9 @@ export class WeekView extends ItemView {
 
   setMode(m: Mode) {
     if (m === "days3" && this.mode !== "days3") {
-      // Start on today when it is in the shown week, else on the week's Monday.
+      // Yesterday–today–tomorrow when today is in the shown week, else the week's Monday onwards.
       const off = diffDays(today(), this.weekStart);
-      this.dayStart = off >= 0 && off < 7 ? today() : this.weekStart;
+      this.dayStart = off >= 0 && off < 7 ? addDays(today(), -1) : this.weekStart;
     }
     this.mode = m;
     this.app.saveLocalStorage(MODE_KEY, m);
@@ -124,7 +124,7 @@ export class WeekView extends ItemView {
   shift(n: number) {
     if (this.mode === "days3" && !this.mobile) {
       this.dayStart = addDays(this.dayStart, DAYS3 * n);
-      this.weekStart = startOfWeek(this.dayStart);
+      this.weekStart = startOfWeek(addDays(this.dayStart, 1)); // the middle day decides the week (goals, planning)
     } else if (this.mode === "month") {
       const anchor = addMonths(this.monthAnchor(), n);
       this.weekStart = startOfWeek(anchor);
@@ -306,7 +306,7 @@ export class WeekView extends ItemView {
     this.timeIndicator = null;
     // The phone always shows one day, so the 3-day view falls back to the week there.
     const mode: Mode = this.mobile && this.mode === "days3" ? "week" : this.mode;
-    if (mode === "days3") this.weekStart = startOfWeek(this.dayStart);
+    if (mode === "days3") this.weekStart = startOfWeek(addDays(this.dayStart, 1)); // the middle day decides the week (goals, planning)
     root.toggleClass("is-mobile", this.mobile);
     root.toggleClass("is-compact", this.compact);
     root.dataset.mode = mode;
