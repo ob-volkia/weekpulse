@@ -4,7 +4,7 @@
 
 Интерфейс на русском.
 
-**[Скачать красивую PDF-инструкцию со скриншотами](https://github.com/ob-volkia/weekpulse/releases/latest/download/Weekpulse-guide.pdf)** — то же самое, что ниже, удобно переслать коллегам.
+**Установка за 5 минут: [ob-volkia.github.io/weekpulse](https://ob-volkia.github.io/weekpulse/)** — короткая страница с кнопками, удобно открыть на iPhone и переслать коллегам.
 
 ---
 

@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Weekpulse — установка</title>
+<meta name="description" content="Недельный планер для Obsidian: как установить за 5 минут.">
+<meta property="og:title" content="Weekpulse — недельный планер для Obsidian">
+<meta property="og:description" content="Установка за 5 минут: iCloud, BRAT, готово.">
+<meta property="og:image" content="img/week.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%237f6df2'/%3E%3Cpath d='M4 12h3.5l2.5-6 4 12 2.5-6H20' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fbfaff; --surface: #ffffff; --card: #f4f2fb; --ink: #16151b; --muted: #67647a; --faint: #9c99ad;
+    --line: #e6e3f0; --accent: #7f6df2; --accent-ink: #5b48d6; --accent-soft: #efecfe; --ok: #2fa85a; --danger: #d9434a; --danger-soft: #fdeeee;
+    --shadow: 0 1px 2px rgba(20,16,50,.05), 0 8px 24px rgba(20,16,50,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f0e14; --surface: #17161f; --card: #1c1a26; --ink: #ecebf3; --muted: #a29fb4; --faint: #6f6c80;
+      --line: #2b2938; --accent: #8f7ff5; --accent-ink: #b3a8ff; --accent-soft: #241f3d; --danger-soft: #331c20;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 Inter, -apple-system, BlinkMacSystemFont, sans-serif; }
+  a { color: var(--accent-ink); }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+
+  header.hero { padding: 48px 0 20px; text-align: center; position: relative; overflow: hidden; }
+  header.hero::before { content: ""; position: absolute; inset: -40% -20% auto; height: 520px; background: radial-gradient(closest-side, rgba(127,109,242,.28), transparent); z-index: 0; pointer-events: none; }
+  header.hero > * { position: relative; }
+  .logo { width: 56px; height: 56px; border-radius: 16px; background: var(--accent); display: inline-grid; place-items: center; box-shadow: 0 10px 30px rgba(127,109,242,.45); }
+  h1 { font-size: clamp(34px, 8vw, 52px); line-height: 1.05; letter-spacing: -.03em; margin: 18px 0 12px; font-weight: 800; }
+  .lead { color: var(--muted); font-size: 18px; max-width: 560px; margin: 0 auto; }
+  .badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 20px 0 0; padding: 0; list-style: none; }
+  .badges li { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 4px 12px; font-size: 13px; color: var(--muted); }
+  .shot { margin: 32px 0 0; border-radius: 14px; overflow: hidden; border: 1px solid #2a2834; box-shadow: var(--shadow); background: #1e1e1e; }
+  .shot img { display: block; width: 100%; height: auto; }
+
+  section { padding: 36px 0 8px; }
+  h2 { font-size: 26px; letter-spacing: -.02em; margin: 0 0 6px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .note { border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 10px 10px 0; padding: 12px 16px; margin: 0 0 20px; font-size: 15px; }
+  .note.warn { border-color: var(--danger); background: var(--danger-soft); }
+
+  ol.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; counter-reset: s; }
+  .step { counter-increment: s; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 18px 18px 64px; position: relative; box-shadow: var(--shadow); }
+  .step::before { content: counter(s); position: absolute; left: 18px; top: 18px; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; display: grid; place-items: center; }
+  .step h3 { margin: 3px 0 6px; font-size: 18px; }
+  .step .where { white-space: nowrap; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); font-weight: 600; margin-left: 6px; }
+  .step p, .step ul { margin: 6px 0; }
+  .step ul { padding-left: 18px; }
+  .step li { margin: 4px 0; }
+  .path b { display: inline-block; background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 0 7px; font-weight: 600; font-size: 14px; line-height: 1.6; white-space: nowrap; }
+  .path i { color: var(--faint); font-style: normal; margin: 0 2px; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 10px; font: 600 15px Inter, sans-serif; text-decoration: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn svg { width: 18px; height: 18px; flex: none; }
+  .copy { display: flex; align-items: stretch; border: 1.5px dashed var(--accent); border-radius: 10px; overflow: hidden; margin: 10px 0 4px; max-width: 100%; }
+  .copy code { flex: 1; min-width: 0; font: 500 16px "JetBrains Mono", ui-monospace, monospace; color: var(--accent-ink); padding: 10px 14px; background: var(--accent-soft); overflow-x: auto; white-space: nowrap; }
+  .copy button { border: 0; border-left: 1.5px dashed var(--accent); background: var(--surface); color: var(--accent-ink); font: 600 14px Inter, sans-serif; padding: 0 14px; min-width: 120px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .copy button.done { color: var(--ok); }
+  .alt { font-size: 14px; color: var(--muted); }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--accent-ink); font-weight: 600; font-size: 15px; }
+
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .feature { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+  .feature img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top left; background: #1e1e1e; }
+  .feature div { padding: 12px 14px; }
+  .feature b { display: block; }
+  .feature span { color: var(--muted); font-size: 14px; }
+
+  .faq details { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; margin: 0 0 10px; }
+  .faq summary { color: var(--ink); }
+  .faq p { margin: 8px 0 0; color: var(--muted); font-size: 15px; }
+
+  footer { text-align: center; color: var(--faint); font-size: 14px; padding: 40px 0 calc(40px + env(safe-area-inset-bottom)); }
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); opacity: 0; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 14px; transition: .2s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%); }
+
+  @media (max-width: 560px) {
+    header.hero { padding-top: 32px; }
+    .lead { font-size: 16px; }
+    .step { padding: 16px 16px 16px 56px; }
+    .step::before { left: 14px; top: 16px; width: 30px; height: 30px; }
+    .grid { grid-template-columns: 1fr; }
+    .btn { flex: 1 1 100%; justify-content: center; }
+    .copy button { min-width: 0; }
+    .copy button .lbl { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hero wrap">
+  <span class="logo" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>
+  <h1>Weekpulse</h1>
+  <p class="lead">Недельный планер для Obsidian: задачи по дням, перетаскивание, профили «Работа / Личное», привычки и фокус. На iPhone и компьютере.</p>
+  <ul class="badges"><li>установка за 5 минут</li><li>бесплатно</li><li>синхронизация через iCloud</li></ul>
+  <div class="shot"><img src="img/week.png" alt="Экран недели Weekpulse" width="1440" height="820"></div>
+</header>
+
+<main class="wrap">
+  <section id="install">
+    <h2>Установка</h2>
+    <p class="sub">Четыре шага, всё внутри Obsidian. Удобнее всего открыть эту страницу на iPhone и идти по шагам.</p>
+    <div class="note"><b>Порядок важен: сначала хранилище в iCloud, потом плагин.</b> Иначе потом придётся переносить данные, чтобы включить синхронизацию.</div>
+
+    <ol class="steps">
+      <li class="step">
+        <h3>Создай хранилище в iCloud <span class="where">iPhone</span></h3>
+        <p>Именно на iPhone: тогда Obsidian сам положит хранилище в iCloud, и оно появится на всех устройствах.</p>
+        <div class="actions">
+          <a class="btn primary" href="https://apps.apple.com/app/obsidian-connected-notes/id1557175442"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Obsidian в App Store</a>
+        </div>
+        <ul>
+          <li>Открой Obsidian → <span class="path"><b>Создать новое хранилище</b></span>, назови, например, «Планер».</li>
+          <li>Включи <span class="path"><b>Хранить в iCloud</b></span> → <span class="path"><b>Создать</b></span>.</li>
+        </ul>
+      </li>
+
+      <li class="step">
+        <h3>Поставь BRAT <span class="where">iPhone</span></h3>
+        <p>BRAT — установщик из официального каталога Obsidian, он поставит Weekpulse и будет сам его обновлять.</p>
+        <ul>
+          <li><span class="path"><b>Настройки</b><i>›</i><b>Сторонние плагины</b><i>›</i><b>Включить сторонние плагины</b></span></li>
+          <li>Нажми кнопку ниже, откроется BRAT в Obsidian → <span class="path"><b>Установить</b><i>›</i><b>Включить</b></span>.</li>
+        </ul>
+        <div class="actions">
+          <a class="btn primary" href="obsidian://show-plugin?id=obsidian42-brat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Открыть BRAT в Obsidian</a>
+        </div>
+        <p class="alt">Не открылось? В Obsidian: <span class="path"><b>Сторонние плагины</b><i>›</i><b>Обзор</b></span> → найди <b>BRAT</b>.</p>
+      </li>
+
+      <li class="step">
+        <h3>Поставь Weekpulse <span class="where">iPhone</span></h3>
+        <p>Нажми кнопку — BRAT откроется с уже вписанным адресом плагина. Останется нажать <span class="path"><b>Add plugin</b></span>.</p>
+        <div class="actions">
+          <a class="btn primary" href="obsidian://brat?plugin=ob-volkia/weekpulse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>Установить Weekpulse</a>
+        </div>
+        <details>
+          <summary>Вручную, если кнопка не сработала</summary>
+          <ul>
+            <li><span class="path"><b>Настройки</b></span> → внизу списка слева <span class="path"><b>BRAT</b></span> → <span class="path"><b>Add beta plugin</b></span>.</li>
+            <li>Вставь адрес плагина:</li>
+          </ul>
+          <div class="copy"><code id="repo">ob-volkia/weekpulse</code><button type="button" data-copy="ob-volkia/weekpulse" aria-label="Скопировать адрес"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="lbl">Копировать</span></button></div>
+          <ul><li>Версию оставь последней, галочку «Enable after installing» не снимай → <span class="path"><b>Add plugin</b></span>.</li></ul>
+        </details>
+        <p>Готово, если на панели появились значки календаря, таймера и огонька. Не включился сам — включи <b>Weekpulse</b> в <span class="path"><b>Сторонние плагины</b></span>.</p>
+      </li>
+
+      <li class="step">
+        <h3>Открой на компьютере <span class="where">по желанию</span></h3>
+        <div class="actions">
+          <a class="btn" href="https://obsidian.md/download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Скачать Obsidian для Mac</a>
+        </div>
+        <ul>
+          <li>Подожди минуту, пока iCloud догрузит папку.</li>
+          <li><span class="path"><b>Открыть папку как хранилище</b><i>›</i><b>iCloud Drive</b><i>›</i><b>Obsidian</b><i>›</i><b>твоё хранилище</b></span></li>
+          <li>На вопрос про доверие плагинам — «Доверять». Weekpulse и BRAT уже там: они приедут через iCloud.</li>
+        </ul>
+      </li>
+    </ol>
+
+    <div class="note warn" style="margin-top:20px"><b>Никогда не нажимай «Удалить хранилище» на iPhone</b> — это удалит папку из iCloud сразу на всех устройствах. Чтобы переподключить хранилище, просто закрой его.</div>
+  </section>
+
+  <section id="features">
+    <h2>Что умеет</h2>
+    <p class="sub">Подробное описание всех функций — в <a href="https://github.com/ob-volkia/weekpulse#readme">полной инструкции</a>.</p>
+    <div class="grid">
+      <div class="feature"><img src="img/days3.png" alt="" loading="lazy"><div><b>3 дня, неделя, месяц, шкала</b><span>Перетаскивай задачи между днями; невыполненное само переезжает на сегодня.</span></div></div>
+      <div class="feature"><img src="img/modal.png" alt="" loading="lazy"><div><b>Задача целиком в одном окне</b><span>Время, дедлайн, повтор, подзадачи, ссылки, файлы и комментарии.</span></div></div>
+      <div class="feature"><img src="img/focus.png" alt="" loading="lazy"><div><b>Фокус и помодоро</b><span>Время записывается в задачу — видно план и факт.</span></div></div>
+      <div class="feature"><img src="img/habits.png" alt="" loading="lazy"><div><b>Привычки и статистика</b><span>Серии, итоги недели и тренды за 12 недель.</span></div></div>
+    </div>
+    <p class="alt" style="margin-top:14px">Быстрый ввод одной строкой: <code style="font-family:'JetBrains Mono',monospace;font-size:14px;background:var(--accent-soft);color:var(--accent-ink);padding:1px 6px;border-radius:5px">Созвон пт 15:00 1ч #работа !!</code> — день, время, длительность, тег и приоритет распознаются сами.</p>
+  </section>
+
+  <section id="faq" class="faq">
+    <h2>Если что-то не так</h2>
+    <details><summary>Плагин не появился на втором устройстве</summary><p>Подожди пару минут, пока iCloud догрузит файлы, и полностью перезапусти Obsidian (на iPhone смахни его из списка приложений). Проверь, что на обоих устройствах открыто одно и то же хранилище из iCloud. Не помогло — поставь Weekpulse через BRAT и там (шаги 2–3).</p></details>
+    <details><summary>Кнопка «Установить Weekpulse» ничего не делает</summary><p>Сначала должен быть установлен и включён BRAT (шаг 2). Если всё равно не открывается — поставь вручную по инструкции под кнопкой.</p></details>
+    <details><summary>Я уже создал хранилище не в iCloud</summary><p>Создай новое на iPhone (шаг 1), затем на Mac перенеси в его папку (iCloud Drive → Obsidian) содержимое старого, включая скрытую папку <code>.obsidian</code> — в Finder её показывает Cmd + Shift + точка.</p></details>
+    <details><summary>Как обновлять плагин</summary><p>Ничего делать не нужно: BRAT проверяет обновления при каждом запуске Obsidian. Вручную — палитра команд → «BRAT: Check for updates to all beta plugins». Задачи и настройки не трогаются.</p></details>
+    <details><summary>Синхронизация зависла</summary><p>Первым делом проверь, не закончилось ли место в iCloud.</p></details>
+    <details><summary>У меня нет iPhone</summary><p>Создай хранилище прямо на компьютере и поставь плагин шагами 2–3. Для синхронизации подойдёт Obsidian Sync или Syncthing.</p></details>
+  </section>
+</main>
+
+<footer class="wrap">
+  <div class="actions" style="justify-content:center;margin-bottom:12px">
+    <button class="btn" type="button" data-copy-url><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>Скопировать ссылку на эту страницу</button>
+  </div>
+  Weekpulse · <a href="https://github.com/ob-volkia/weekpulse">GitHub</a> · MIT
+</footer>
+
+<div class="toast" role="status" aria-live="polite"></div>
+
+<script>
+  const toast = document.querySelector(".toast");
+  let tt;
+  function say(msg) { toast.textContent = msg; toast.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => toast.classList.remove("show"), 1800); }
+  async function copy(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) {}
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    let ok = false; try { ok = document.execCommand("copy"); } catch (e) {}
+    ta.remove(); return ok;
+  }
+  document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
+    const ok = await copy(b.dataset.copy);
+    say(ok ? "Адрес скопирован" : "Не получилось — выдели и скопируй вручную");
+    if (ok) { b.classList.add("done"); setTimeout(() => b.classList.remove("done"), 1500); }
+  }));
+  document.querySelector("[data-copy-url]").addEventListener("click", async () => {
+    const url = location.href.split("#")[0];
+    if (navigator.share && matchMedia("(pointer: coarse)").matches) { try { await navigator.share({ title: "Weekpulse", url }); return; } catch (e) {} }
+    say((await copy(url)) ? "Ссылка скопирована" : url);
+  });
+</script>
+</body>
+</html>

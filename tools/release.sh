@@ -8,7 +8,6 @@ V=$(node -p 'require("./manifest.json").version')
 npm run check
 rm -rf release/build && OUT_DIR=release/build node esbuild.config.mjs
 git push origin HEAD
-cp "docs/guide/Weekpulse — инструкция.pdf" release/build/Weekpulse-guide.pdf
-gh release create "$V" release/build/main.js release/build/manifest.json release/build/styles.css release/build/Weekpulse-guide.pdf \
+gh release create "$V" release/build/main.js release/build/manifest.json release/build/styles.css \
   --title "$V" --notes "${NOTES:-Weekpulse $V}"
 echo "Released $V"
