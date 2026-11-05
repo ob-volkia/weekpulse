@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Weekpulse — инструкция</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm 16mm 18mm; }
+  @page :first { margin: 0; }
+  :root {
+    --ink: #17161c; --muted: #6b6878; --faint: #a19eab; --line: #e7e5ee;
+    --accent: #7f6df2; --accent-ink: #5b48d6; --accent-soft: #f1eefe;
+    --green: #2fa85a; --orange: #d9822b; --red: #e0464b;
+    --card: #f8f7fb;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font-family: Inter, -apple-system, sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.55; }
+  a { color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid #d9d3fb; }
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .88em; background: var(--accent-soft); color: var(--accent-ink); padding: 1px 5px; border-radius: 4px; }
+  kbd { font-family: Inter, sans-serif; font-size: .85em; font-weight: 600; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; background: #fff; white-space: nowrap; }
+
+  /* cover */
+  .cover { height: 296mm; width: 210mm; position: relative; overflow: hidden; display: flex; flex-direction: column; background: #0f0e14; color: #fff; page-break-after: always; padding: 26mm 20mm 0; }
+  .cover::before { content: ""; position: absolute; width: 170mm; height: 170mm; right: -60mm; top: -50mm; border-radius: 50%; background: radial-gradient(circle, rgba(127,109,242,.55), rgba(127,109,242,0) 65%); }
+  .cover .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: .02em; color: #cfc8ff; font-size: 11pt; position: relative; }
+  .pulse { width: 34px; height: 34px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; }
+  .cover h1 { font-size: 54pt; line-height: 1; margin: 22mm 0 6mm; font-weight: 800; letter-spacing: -.03em; position: relative; }
+  .cover .lead { font-size: 15pt; line-height: 1.45; color: #cbc8d6; max-width: 135mm; position: relative; }
+  .cover .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9mm; position: relative; }
+  .cover .chips span { border: 1px solid #3a3650; color: #dcd8ee; border-radius: 99px; padding: 4px 12px; font-size: 9.5pt; }
+  .cover .hero { margin: auto -40mm 0 0; transform: translateY(14mm); border-radius: 14px; overflow: hidden; border: 1px solid #2e2b3d; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .cover .hero img { display: block; width: 100%; }
+  .cover .meta { position: relative; margin-top: 10mm; font-size: 9.5pt; color: #8e8a9e; }
+  .cover .meta a { color: #cfc8ff; border-color: #4a4466; }
+
+  /* content */
+  h2 { font-size: 21pt; letter-spacing: -.02em; margin: 0 0 3mm; font-weight: 800; }
+  h2 .num { color: var(--accent); margin-right: 6px; }
+  h3 { font-size: 12.5pt; margin: 7mm 0 2mm; font-weight: 700; }
+  p { margin: 0 0 2.5mm; }
+  .section { page-break-before: always; }
+  .intro { color: var(--muted); font-size: 11.5pt; margin-bottom: 6mm; max-width: 160mm; }
+  ul { margin: 0 0 3mm; padding-left: 5mm; } li { margin: 1mm 0; }
+  .shot { border-radius: 10px; overflow: hidden; border: 1px solid #2a2833; margin: 4mm 0 2mm; break-inside: avoid; background: #1e1e1e; }
+  .shot img { display: block; width: 100%; }
+  .cap { color: var(--muted); font-size: 9pt; margin-bottom: 4mm; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; align-items: start; }
+  .side { display: grid; grid-template-columns: 62mm 1fr; gap: 8mm; align-items: start; }
+  .phone { border-radius: 26px; overflow: hidden; border: 6px solid #111; box-shadow: 0 10px 30px rgba(0,0,0,.18); background: #1e1e1e; }
+  .phone img { display: block; width: 100%; }
+
+  /* steps */
+  .steps { counter-reset: s; display: grid; gap: 4mm; margin-top: 4mm; }
+  .step { break-inside: avoid; display: grid; grid-template-columns: 13mm 1fr; gap: 4mm; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 5mm 6mm; }
+  .step .n { width: 11mm; height: 11mm; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 13pt; }
+  .step h4 { margin: 1mm 0 2mm; font-size: 12pt; }
+  .step ol { margin: 0; padding-left: 5mm; } .step li { margin: .8mm 0; }
+  .path { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .path b { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; font-weight: 600; font-size: .95em; }
+  .path i { color: var(--faint); font-style: normal; }
+  .repo { display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 12pt; font-weight: 500; background: #fff; border: 1.5px dashed var(--accent); color: var(--accent-ink); padding: 2mm 5mm; border-radius: 8px; margin: 1.5mm 0; }
+  .note { break-inside: avoid; border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 3mm 5mm; border-radius: 0 8px 8px 0; margin: 4mm 0; }
+  .warn { border-left-color: var(--red); background: #fdeeee; }
+  .warn b { color: var(--red); }
+
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0 4mm; font-size: 9.8pt; break-inside: avoid; }
+  th { text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 2mm 3mm; border-bottom: 1.5px solid var(--ink); }
+  td { padding: 2mm 3mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { white-space: nowrap; }
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .mode { break-inside: avoid; }
+  .mode .shot { margin: 0 0 2mm; }
+  .mode b { display: block; font-size: 11pt; }
+  .mode span { color: var(--muted); font-size: 9.3pt; }
+  .feat { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 8mm; }
+  .feat div { break-inside: avoid; }
+  .feat b { display: block; margin-bottom: 1mm; }
+  .toc { columns: 2; column-gap: 10mm; margin-top: 4mm; }
+  .toc a { display: flex; justify-content: space-between; border: 0; color: var(--ink); padding: 2mm 0; border-bottom: 1px solid var(--line); break-inside: avoid; }
+  .toc a span { color: var(--accent); font-weight: 700; margin-right: 3mm; }
+  .end { text-align: center; color: var(--muted); margin-top: 12mm; font-size: 9.5pt; }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<section class="cover">
+  <div class="brand"><span class="pulse"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></span>WEEKPULSE · ПЛАГИН ДЛЯ OBSIDIAN</div>
+  <h1>Пульс<br>твоей недели</h1>
+  <div class="lead">Недельный планер прямо в Obsidian: задачи по дням, перетаскивание, профили «Работа / Личное», привычки, фокус и статистика. На компьютере и на iPhone.</div>
+  <div class="chips"><span>3 дня · неделя · месяц · шкала</span><span>iCloud-синхронизация</span><span>привычки и тренды</span><span>помодоро</span></div>
+  <div class="meta">Инструкция по установке и работе · версия 3.5<br><a href="https://github.com/ob-volkia/weekpulse">github.com/ob-volkia/weekpulse</a></div>
+  <div class="hero"><img src="img/week.png"></div>
+</section>
+
+<!-- TOC -->
+<section>
+  <h2>Что внутри</h2>
+  <p class="intro">Первые две страницы — установка, это займёт минут пять. Дальше — как всем пользоваться, можно читать по мере надобности.</p>
+  <div class="toc">
+    <a href="#install"><span>1</span>Установка<em></em></a>
+    <a href="#start"><span>2</span>Первый запуск</a>
+    <a href="#week"><span>3</span>Экран недели и виды</a>
+    <a href="#add"><span>4</span>Как добавлять задачи</a>
+    <a href="#task"><span>5</span>Окно задачи</a>
+    <a href="#actions"><span>6</span>Действия с задачами</a>
+    <a href="#profiles"><span>7</span>Профили, цели, фильтры</a>
+    <a href="#plan"><span>8</span>Планирование и бэклог</a>
+    <a href="#focus"><span>9</span>Фокус и привычки</a>
+    <a href="#more"><span>10</span>Шаблоны, календари, заметки</a>
+    <a href="#iphone"><span>11</span>iPhone</a>
+    <a href="#data"><span>12</span>Данные и синхронизация</a>
+    <a href="#keys"><span>13</span>Горячие клавиши</a>
+    <a href="#faq"><span>14</span>Частые вопросы</a>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section class="section" id="install">
+  <h2><span class="num">1</span>Установка</h2>
+  <p class="intro">Всё делается прямо в Obsidian, никаких файлов вручную. Плагин ставится через <b>BRAT</b> — установщик из официального каталога Obsidian. Он же потом сам обновляет Weekpulse.</p>
+  <div class="note"><b>Порядок важен: сначала хранилище в iCloud, потом плагин.</b> Если создать хранилище «где-нибудь» на компьютере, а синхронизацию захотеть потом, придётся всё переносить.</div>
+
+  <div class="steps">
+    <div class="step"><div class="n">1</div><div>
+      <h4>Создай хранилище в iCloud — на iPhone</h4>
+      <p>Именно на iPhone: так Obsidian сам положит хранилище в нужную папку iCloud, и оно появится на всех твоих устройствах.</p>
+      <ol>
+        <li>Установи Obsidian из <a href="https://apps.apple.com/app/obsidian-connected-notes/id1557175442">App Store</a> и открой его.</li>
+        <li><span class="path"><b>Создать новое хранилище</b></span> → придумай название, например «Планер».</li>
+        <li>Включи <span class="path"><b>Хранить в iCloud</b></span> → <span class="path"><b>Создать</b></span>.</li>
+      </ol>
+    </div></div>
+
+    <div class="step"><div class="n">2</div><div>
+      <h4>Поставь BRAT</h4>
+      <ol>
+        <li><span class="path"><b>Настройки</b><i>›</i><b>Сторонние плагины</b><i>›</i><b>Включить сторонние плагины</b></span></li>
+        <li>Там же <span class="path"><b>Обзор</b></span> → в поиске набери <b>BRAT</b> → <span class="path"><b>Установить</b><i>›</i><b>Включить</b></span>.</li>
+      </ol>
+      <p style="margin-top:2mm">Если читаешь с телефона, где стоит Obsidian, можно просто нажать: <a href="obsidian://show-plugin?id=obsidian42-brat">открыть BRAT в Obsidian</a>.</p>
+    </div></div>
+
+    <div class="step"><div class="n">3</div><div>
+      <h4>Поставь Weekpulse через BRAT</h4>
+      <ol>
+        <li><span class="path"><b>Настройки</b></span> → в самом низу списка слева <span class="path"><b>BRAT</b></span>.</li>
+        <li>Нажми <span class="path"><b>Add beta plugin</b></span> и вставь адрес:<br><span class="repo">ob-volkia/weekpulse</span></li>
+        <li>Версию оставь последней, галочку <i>Enable after installing the plugin</i> не снимай → <span class="path"><b>Add plugin</b></span>.</li>
+      </ol>
+      <p style="margin-top:2mm">Готово: на панели появятся значки календаря (неделя), таймера (фокус) и огонька (привычки). Если плагин не включился сам — включи <b>Weekpulse</b> в <span class="path"><b>Сторонние плагины</b></span>.</p>
+    </div></div>
+
+    <div class="step"><div class="n">4</div><div>
+      <h4>Компьютер — по желанию</h4>
+      <ol>
+        <li>Установи <a href="https://obsidian.md/download">Obsidian</a> на Mac и подожди минуту, пока iCloud синхронизирует папку.</li>
+        <li><span class="path"><b>Открыть папку как хранилище</b><i>›</i><b>iCloud Drive</b><i>›</i><b>Obsidian</b><i>›</i><b>твоё хранилище</b></span></li>
+        <li>Если Obsidian спросит про доверие плагинам — «Доверять». Weekpulse и BRAT уже на месте: они приехали из iCloud вместе с хранилищем.</li>
+      </ol>
+    </div></div>
+  </div>
+
+  <h3>Обновления</h3>
+  <p>BRAT сам проверяет обновления при каждом запуске Obsidian. Вручную: палитра команд (<kbd>Cmd</kbd> + <kbd>P</kbd>) → <b>BRAT: Check for updates to all beta plugins</b>. Задачи и настройки при обновлении не трогаются.</p>
+  <h3>Если iPhone нет</h3>
+  <p>Создай хранилище прямо на компьютере и поставь плагин шагами 2–3. Для синхронизации потом подойдёт <a href="https://obsidian.md/sync">Obsidian Sync</a> или Syncthing.</p>
+</section>
+
+<!-- START -->
+<section id="start" style="margin-top:9mm">
+  <h2><span class="num">2</span>Первый запуск</h2>
+  <p class="intro">При первом включении плагин сам создаёт папку <code>Planner/</code> с файлами задач, привычек и шаблонов. Можно сразу пользоваться, но стоит заглянуть в <span class="path"><b>Настройки</b><i>›</i><b>Weekpulse</b></span>.</p>
+  <div class="feat">
+    <div><b>Профили</b>По умолчанию есть «Работа» и «Личное». Переименуй, поменяй цвета или добавь свои.</div>
+    <div><b>Ёмкость дня</b>Сколько часов в день ты реально планируешь. От этого зависит полоска загрузки дня.</div>
+    <div><b>Автоперенос невыполненного</b>Включён: вчерашние незакрытые задачи утром сами оказываются на сегодня.</div>
+    <div><b>Календари</b>Подключи Google или Apple Календарь, чтобы видеть встречи рядом с задачами (раздел 10).</div>
+  </div>
+
+</section>
+<section class="section" id="week">
+  <h2><span class="num">3</span>Экран недели</h2>
+  <div class="shot"><img src="img/week.png"></div>
+  <div class="cap">Неделя: бэклог слева, дни с полоской загрузки, события календаря синим, карточки задач.</div>
+  <ul>
+    <li><b>Слева</b> — стрелки «назад / вперёд», «Сегодня» и даты на экране.</li>
+    <li><b>По центру</b> — переключатель вида.</li>
+    <li><b>Справа</b> — профиль, цели недели, фильтр, поиск, планирование, фокус, привычки, проекты, меню <b>⋯</b> и кнопка <b>+ Задача</b>.</li>
+    <li><b>Бэклог</b> — задачи без даты, всё «когда-нибудь».</li>
+    <li><b>Полоска под днём</b> — сколько часов запланировано. Если больше ёмкости дня, день краснеет.</li>
+    <li>Значок <b>↪ 6</b> на карточке — сколько раз задачу переносили. После 5 переносов плагин предложит разбить её, отправить в бэклог или удалить.</li>
+  </ul>
+</section>
+
+<section class="section">
+  <h3 style="margin-top:0">Четыре вида</h3>
+  <div class="modes">
+    <div class="mode"><div class="shot"><img src="img/days3.png"></div><b>3 дня</b><span>Вчера, сегодня, завтра — широкие колонки, когда в задачах много текста. Стрелки листают по 3 дня.</span></div>
+    <div class="mode"><div class="shot"><img src="img/week.png"></div><b>Неделя</b><span>Бэклог и 7 колонок. Основной вид.</span></div>
+    <div class="mode"><div class="shot"><img src="img/month.png"></div><b>Месяц</b><span>Календарная сетка, задачи перетаскиваются между любыми днями. Клик по числу открывает неделю.</span></div>
+    <div class="mode"><div class="shot"><img src="img/timeline.png"></div><b>Шкала</b><span>Почасовая сетка: перетащи задачу на час — время выставится с шагом 15 минут.</span></div>
+  </div>
+  <p style="margin-top:4mm">Выбранный вид запоминается на каждом устройстве отдельно. Клавиши: <kbd>3</kbd> <kbd>w</kbd> <kbd>m</kbd> <kbd>l</kbd>.</p>
+
+</section>
+<section class="section" id="add">
+  <h2><span class="num">4</span>Как добавлять задачи</h2>
+  <p>Кнопка <b>+ Задача</b> (или <kbd>n</kbd>), поле «Добавить…» внизу колонки дня, или <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> из любого места Obsidian. Пиши всё одной строкой — плагин разберёт сам:</p>
+  <table>
+    <tr><th>Пишешь</th><th>Получится</th></tr>
+    <tr><td><code>завтра</code> <code>пт</code> <code>15.12</code></td><td>день</td></tr>
+    <tr><td><code>бэклог</code></td><td>без даты</td></tr>
+    <tr><td><code>14:00</code> <code>@9</code></td><td>время</td></tr>
+    <tr><td><code>1ч</code> <code>30м</code> <code>1ч30м</code></td><td>длительность</td></tr>
+    <tr><td><code>#работа</code></td><td>тег</td></tr>
+    <tr><td><code>!!!</code> <code>!!</code> <code>!</code> <code>!-</code></td><td>приоритет: срочно, высокий, средний, низкий</td></tr>
+    <tr><td><code>до пт</code> <code>до 15.12</code></td><td>дедлайн</td></tr>
+    <tr><td><code>по будням</code> <code>каждый пн и чт</code></td><td>повтор (ещё: каждый день, каждую неделю, каждый месяц, каждые 3 дня)</td></tr>
+    <tr><td><code>[[Сайт]]</code></td><td>задача попадает в проект «Сайт»</td></tr>
+  </table>
+  <div class="note">Пример: <code>Созвон с клиентом пт 15:00 1ч #работа !!</code> — встреча на ближайшую пятницу в 15:00, на час, с тегом и высоким приоритетом.</div>
+</section>
+
+<!-- TASK -->
+<section class="section" id="task">
+  <h2><span class="num">5</span>Окно задачи</h2>
+  <div class="side">
+    <div class="shot" style="margin-top:0"><img src="img/modal.png"></div>
+    <div>
+      <p>Открывается кликом по карточке. Сверху — название и строка <b>чипов</b>: нажми любой, чтобы изменить.</p>
+      <ul>
+        <li>день и профиль;</li>
+        <li>время и длительность;</li>
+        <li>дедлайн и приоритет;</li>
+        <li>теги, повтор, цель недели.</li>
+      </ul>
+      <p>Ниже — <b>содержимое задачи</b>:</p>
+      <ul>
+        <li><b>Описание</b> — подробности, ТЗ, мысли;</li>
+        <li><b>Подзадачи</b> — чек-лист внутри задачи;</li>
+        <li><b>Ссылки</b> — вставь адрес, заголовок страницы подтянется сам;</li>
+        <li><b>Файлы</b> — документ или фото, хранятся в <code>Planner/Attachments/</code>;</li>
+        <li><b>Комментарии</b> — заметки по ходу работы.</li>
+      </ul>
+      <p>Внизу: удалить, запустить фокус, открыть задачу как отдельную заметку, «Сохранить».</p>
+      <p>Если задачу переносили много раз, сверху появится подсказка с быстрыми решениями.</p>
+    </div>
+  </div>
+
+  <h2 style="margin-top:9mm" id="actions"><span class="num">6</span>Действия с задачами</h2>
+  <table>
+    <tr><th>Действие</th><th>Компьютер</th><th>iPhone</th></tr>
+    <tr><td>На другой день</td><td>перетащи карточку</td><td>удерживай и тяни на день в полосе</td></tr>
+    <tr><td>На неделю вперёд / назад</td><td colspan="2">брось карточку на стрелку в шапке (подержи — неделя перелистнётся)</td></tr>
+    <tr><td>Выполнено</td><td>галочка</td><td>галочка или свайп влево</td></tr>
+    <tr><td>На завтра</td><td>меню карточки</td><td>свайп вправо</td></tr>
+    <tr><td>Быстрое меню</td><td>правый клик</td><td>всё есть в окне задачи</td></tr>
+    <tr><td>Несколько сразу</td><td><kbd>Shift</kbd>/<kbd>Cmd</kbd> + клик</td><td><b>⋯</b> → «Выбрать задачи»</td></tr>
+  </table>
+  <ul>
+    <li><b>Повторяющиеся задачи:</b> отметил выполненной — следующая появится сама.</li>
+    <li><b>Отмена:</b> после удаления и массовых действий внизу на несколько секунд появляется «Отменить». На компьютере — <kbd>Cmd</kbd>+<kbd>Z</kbd>.</li>
+  </ul>
+</section>
+
+<!-- PROFILES -->
+<section class="section" id="profiles">
+  <h2><span class="num">7</span>Профили, цели, фильтры</h2>
+  <h3>Профили</h3>
+  <p>Разделяют задачи, например на «Работа» и «Личное», но всё остаётся в одном планере.</p>
+  <ul>
+    <li>Переключатель — кнопка с цветной точкой в шапке. <b>«Всё»</b> показывает задачи всех профилей.</li>
+    <li>Новая задача получает текущий профиль; в режиме «Всё» — профиль по умолчанию.</li>
+    <li>Полоска загрузки дня считает <b>все</b> профили — чтобы не перегрузить день скрытыми задачами.</li>
+    <li>Выбор запоминается на каждом устройстве: на работе «Работа», дома «Всё».</li>
+  </ul>
+  <div class="feat" style="margin-top:5mm">
+    <div><b>Цели недели</b>Кнопка с мишенью: 1–3 главные цели. Задачу привязывают к цели чипом в окне задачи; выбор цели в списке показывает только её задачи.</div>
+    <div><b>Фильтр</b>По тегу, приоритету или цели. Удачную комбинацию можно сохранить под именем и включать одним нажатием.</div>
+    <div><b>Поиск — <kbd>Cmd</kbd>+<kbd>K</kbd></b>Находит любую задачу, включая старые из архива. Найденную можно сразу выполнить или перенести.</div>
+    <div><b>Проекты</b>Ссылка <code>[[Название]]</code> в задаче делает её частью проекта. На экране «Проекты» — прогресс, остаток времени и просрочки.</div>
+  </div>
+
+</section>
+<section class="section" id="plan">
+  <h2><span class="num">8</span>Планирование и бэклог</h2>
+  <div class="shot"><img src="img/planning.png"></div>
+  <div class="cap">Планирование недели: слева хвосты и бэклог, справа дни с загрузкой.</div>
+  <div class="feat">
+    <div><b>Спланировать неделю</b>Кнопка с волшебной палочкой или <kbd>p</kbd>. Раскидываешь задачи по дням перетаскиванием. В воскресенье и понедельник плагин сам предложит это сделать.</div>
+    <div><b>Разобрать бэклог</b><b>⋯</b> → «Разобрать бэклог». Задачи по одной, от самых старых: сегодня, завтра, на неделе, на следующей, оставить или удалить. Клавиши <kbd>1</kbd>–<kbd>4</kbd>, пробел, <kbd>⌫</kbd>.</div>
+    <div><b>Итоги недели</b>Команда «Итоги текущей недели» создаёт заметку в <code>Planner/Reviews/</code>: цифры, сделанное, проекты, привычки и вопросы для рефлексии.</div>
+  </div>
+</section>
+
+<!-- FOCUS & HABITS -->
+<section class="section" id="focus">
+  <h2><span class="num">9</span>Фокус и привычки</h2>
+  <div class="shot"><img src="img/focus.png"></div>
+  <div class="cap">Фокус: задачи на сегодня и таймер помодоро.</div>
+  <ul>
+    <li><b>Помодоро</b> — 25 минут работы и 5 отдыха (меняется в настройках). Пробел — старт / пауза.</li>
+    <li>Запусти фокус на задаче — потраченное время запишется в неё, на карточке видно план и факт.</li>
+    <li><b>Напоминания:</b> за 10 минут до задачи со временем. На iPhone — пока Obsidian открыт.</li>
+  </ul>
+  <div class="shot"><img src="img/habits.png"></div>
+  <div class="cap">Привычки и статистика: отметки по дням, серии, итоги недели, тренды.</div>
+  <ul>
+    <li>Добавь привычку и выбери дни (или каждый день), отмечай в сетке — серия считается сама.</li>
+    <li><b>Статистика недели:</b> выполнено по дням, тегам и проектам, точность оценок времени, что чаще всего откладывается.</li>
+    <li><b>Тренды</b> за 4, 8 или 12 недель: процент выполнения, самые продуктивные дни, активность.</li>
+  </ul>
+</section>
+
+<!-- MORE -->
+<section class="section" id="more">
+  <h2><span class="num">10</span>Шаблоны, календари, заметки</h2>
+  <h3>Шаблоны</h3>
+  <p><b>⋯</b> → «Шаблоны…»: применить шаблон к неделе или сохранить текущую неделю как шаблон. Через <b>⋯</b> в шапке дня — то же для одного дня. Шаблоны лежат в <code>Planner/Templates.md</code>.</p>
+  <h3>Календари</h3>
+  <p>Встречи видны в колонках дней и на шкале и учитываются в загрузке. Подключение: <span class="path"><b>Настройки</b><i>›</i><b>Weekpulse</b><i>›</i><b>Ссылки на календари (ICS)</b></span>, по одной ссылке в строке.</p>
+  <ul>
+    <li><b>Google Calendar:</b> на компьютере <a href="https://calendar.google.com/calendar/r/settings">настройки календаря</a> → нужный календарь → «Интеграция календаря» → «Секретный адрес в формате iCal».</li>
+    <li><b>Apple Календарь:</b> «Календарь» на iPhone → (i) у календаря → «Публичный календарь» → «Поделиться ссылкой». Ссылка начинается с <code>webcal://</code> — так и вставляй.</li>
+  </ul>
+  <p>Календари обновляются раз в 30 минут и по команде «Обновить календари».</p>
+  <h3>Заметка дня</h3>
+  <p>Клик по числу в шапке дня создаёт <code>Daily/ГГГГ-ММ-ДД.md</code> с живым списком задач и привычек — их можно отмечать прямо в заметке. Такой блок можно вставить в любую заметку: <code>```planner-day</code>.</p>
+  <h3>Задачи из других заметок</h3>
+  <p>Любая строка <code>- [ ] Сделать что-то 📅 2026-11-10</code> в любой заметке появится в неделе — с пунктирной рамкой и названием заметки. Отметка и перенос меняют строку прямо в исходной заметке.</p>
+
+</section>
+<section class="section" id="iphone">
+  <h2><span class="num">11</span>iPhone</h2>
+  <div class="side">
+    <div class="phone"><img src="img/phone-day.png"></div>
+    <div>
+      <ul>
+        <li>Сверху полоса дней недели, под ней — один выбранный день.</li>
+        <li><b>Перенос:</b> удерживай карточку и тяни на день в полосе.</li>
+        <li><b>Свайпы:</b> влево — выполнено, вправо — на завтра.</li>
+        <li><b>«+» в нижней панели Obsidian</b> включается в <span class="path"><b>Настройки</b><i>›</i><b>Weekpulse</b><i>›</i><b>iPhone</b></span>. Это неофициальная возможность: после обновления Obsidian кнопка может пропасть — тогда просто выключи её.</li>
+        <li><b>Саму нижнюю панель</b> настраивают в <span class="path"><b>Настройки</b><i>›</i><b>Панель инструментов для мобильных</b></span>: убери лишнее, добавь «Открыть неделю» или «Новая задача».</li>
+        <li>Вид «3 дня» на телефоне работает как «Неделя» — там и так один день на экране.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- DATA -->
+<section class="section" id="data">
+  <h2><span class="num">12</span>Данные и синхронизация</h2>
+  <p class="intro">Всё лежит в обычных Markdown-файлах внутри твоего хранилища — их можно открыть и поправить руками. Никаких серверов: данные видишь только ты.</p>
+  <div class="note warn"><b>Никогда не нажимай «Удалить хранилище» на iPhone.</b> Это удаляет папку из iCloud сразу на всех устройствах. Если нужно переподключить хранилище — просто закрой его.</div>
+  <div class="feat">
+    <div><b>Слияние правок</b>Поменял задачи на двух устройствах почти одновременно — плагин сольёт обе версии, а не затрёт одну другой.</div>
+    <div><b>Конфликты iCloud</b>Если iCloud создаст копию вида <code>Tasks 2.md</code>, плагин предложит слить её в основной файл.</div>
+    <div><b>Резервные копии</b>Раз в день в <code>Planner/Backups/</code>, хранятся 30 дней. Вернуть: <kbd>Cmd</kbd>+<kbd>P</kbd> → «Восстановить из резервной копии…».</div>
+    <div><b>Журнал изменений</b><b>⋯</b> → «Журнал изменений»: что, когда и с какого устройства менялось. Удалённую задачу можно вернуть.</div>
+  </div>
+  <table>
+    <tr><th>Путь</th><th>Что там</th></tr>
+    <tr><td><code>Planner/Tasks.md</code></td><td>все текущие задачи, одна строка — одна задача</td></tr>
+    <tr><td><code>Planner/Habits.md</code></td><td>привычки и журнал отметок</td></tr>
+    <tr><td><code>Planner/Goals.md</code></td><td>цели по неделям</td></tr>
+    <tr><td><code>Planner/Templates.md</code></td><td>шаблоны дня и недели</td></tr>
+    <tr><td><code>Planner/Tasks/</code></td><td>описания, ссылки и комментарии задач</td></tr>
+    <tr><td><code>Planner/Attachments/</code></td><td>прикреплённые файлы</td></tr>
+    <tr><td><code>Planner/Archive/</code></td><td>выполненные задачи старше 30 дней</td></tr>
+    <tr><td><code>Planner/Reviews/</code> · <code>Backups/</code> · <code>Log/</code></td><td>итоги недель, резервные копии, журнал</td></tr>
+  </table>
+  <p>Формат строки совместим с популярным плагином Tasks: <code>- [ ] Созвон #работа [time:: 15:00] [dur:: 1h] ⏫ 📅 2026-11-06</code></p>
+</section>
+
+<!-- KEYS -->
+<section class="section" id="keys">
+  <h2><span class="num">13</span>Горячие клавиши</h2>
+  <p class="intro">На экране недели, на компьютере. На Windows вместо <kbd>Cmd</kbd> — <kbd>Ctrl</kbd>.</p>
+  <div class="grid2">
+    <table>
+      <tr><th>Клавиша</th><th>Действие</th></tr>
+      <tr><td><kbd>n</kbd></td><td>новая задача</td></tr>
+      <tr><td><kbd>t</kbd></td><td>сегодня</td></tr>
+      <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>назад / вперёд</td></tr>
+      <tr><td><kbd>3</kbd> <kbd>w</kbd> <kbd>m</kbd> <kbd>l</kbd></td><td>3 дня / неделя / месяц / шкала</td></tr>
+      <tr><td><kbd>p</kbd></td><td>спланировать неделю</td></tr>
+      <tr><td><kbd>f</kbd></td><td>фокус</td></tr>
+      <tr><td><kbd>d</kbd></td><td>показать / скрыть выполненные</td></tr>
+      <tr><td><kbd>Cmd</kbd>+<kbd>K</kbd></td><td>найти задачу</td></tr>
+      <tr><td><kbd>Cmd</kbd>+<kbd>Z</kbd></td><td>отменить</td></tr>
+    </table>
+    <table>
+      <tr><th>Клавиша</th><th>С выбранной карточкой</th></tr>
+      <tr><td>стрелки, <kbd>j</kbd> <kbd>k</kbd></td><td>выбрать карточку</td></tr>
+      <tr><td><kbd>x</kbd> или пробел</td><td>выполнено</td></tr>
+      <tr><td><kbd>Enter</kbd> или <kbd>e</kbd></td><td>открыть задачу</td></tr>
+      <tr><td><kbd>1</kbd>–<kbd>7</kbd></td><td>на день недели</td></tr>
+      <tr><td><kbd>0</kbd></td><td>в бэклог</td></tr>
+      <tr><td><kbd>Delete</kbd></td><td>удалить</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>снять выбор</td></tr>
+    </table>
+  </div>
+  <p>Откуда угодно в Obsidian: <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> — новая задача, <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> — поиск. Все команды есть в палитре (<kbd>Cmd</kbd>+<kbd>P</kbd>, начни печатать «Weekpulse»); свои сочетания — в <span class="path"><b>Настройки</b><i>›</i><b>Горячие клавиши</b></span>.</p>
+
+</section>
+<section class="section" id="faq">
+  <h2><span class="num">14</span>Частые вопросы</h2>
+  <h3>Плагин не появился на компьютере или iPhone</h3>
+  <p>Подожди пару минут, пока iCloud догрузит файлы, и полностью перезапусти Obsidian. Проверь, что сторонние плагины включены и что на обоих устройствах открыто одно и то же хранилище из iCloud. Не помогло — поставь Weekpulse через BRAT и на этом устройстве (шаги 2–3).</p>
+  <h3>Я уже создал хранилище на компьютере, не в iCloud</h3>
+  <p>Создай новое на iPhone (шаг 1), затем на Mac перенеси в его папку (<span class="path"><b>iCloud Drive</b><i>›</i><b>Obsidian</b></span>) содержимое старого, включая скрытую папку <code>.obsidian</code> — в Finder её показывает <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>.</kbd></p>
+  <h3>Задача пропала</h3>
+  <p>Загляни в «Журнал изменений» — там видно, что с ней случилось, и её можно вернуть. Ещё проверь, не включён ли фильтр или другой профиль.</p>
+  <h3>Не видно выполненных задач</h3>
+  <p>Они скрыты: <kbd>d</kbd> или <b>⋯</b> → «Показать выполненные».</p>
+  <h3>Синхронизация зависла</h3>
+  <p>Первым делом проверь, не закончилось ли место в iCloud.</p>
+
+  <div class="end">Weekpulse · <a href="https://github.com/ob-volkia/weekpulse">github.com/ob-volkia/weekpulse</a> · лицензия MIT</div>
+</section>
+
+</body>
+</html>

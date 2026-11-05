@@ -30,7 +30,7 @@ vault.files.set("Planner/Tasks.md", `# Задачи
 `);
 const log: string[] = [];
 for (let i = 1; i < 20; i++) if (i % 4) log.push(`- ${addDays(T,-i)}: water${i % 3 ? ", run" : ""}`);
-vault.files.set("Planner/Habits.md", `# Привычки\n\n## Список\n\n- 💧 Вода 🆔 water\n- 🏃 Пробежка [days:: 1,3,5] 🆔 run\n- 📖 Чтение 20 минут 🆔 read\n\n## Журнал\n\n${log.join("\n")}\n`);
+vault.files.set("Planner/Habits.md", `# Привычки\n\n## Список\n\n- Вода 🆔 water\n- Пробежка [days:: 1,3,5] 🆔 run\n- Чтение 20 минут 🆔 read\n\n## Журнал\n\n${log.join("\n")}\n`);
 
 vault.files.set("Проекты/Сайт.md", `# Сайт\n\n- [ ] Сверстать лендинг [[Сайт]] 📅 ${addDays(T,-2)}\n- [ ] Подключить аналитику 📅 ${addDays(T,2)} ^blk1\n`);
 vault.files.set("Planner/Templates.md", `# Шаблоны\n\n## Рабочий понедельник\n- [ ] Планёрка #работа [time:: 10:00] [dur:: 30m] [day:: 1]\n- [ ] Спорт [day:: 3]\n`);
