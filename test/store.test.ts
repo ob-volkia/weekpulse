@@ -271,6 +271,9 @@ END:VCALENDAR`;
     eq("under «Всё» new task gets the default profile", added2.profile, "personal");
     store.setProfile("personal");
     eq("personal shows default and orphaned tasks", store.shown().map((t) => t.id).sort(), ["g", "p", added2.id].sort());
+    await store.bulk(["p", "g"], { profile: "work" });
+    store.setProfile("work");
+    eq("bulk move to a profile", store.shown().map((t) => t.id).filter((id) => id === "p" || id === "g").sort(), ["g", "p"]);
   }
   {
     const ix = new ExternalIndex({} as any, () => false);

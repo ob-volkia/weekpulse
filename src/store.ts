@@ -591,16 +591,17 @@ export class Store extends Events {
 
   // ---------- bulk (multi-select) ----------
 
-  async bulk(ids: string[], op: "done" | "remove" | { due: DateStr | null }) {
+  async bulk(ids: string[], op: "done" | "remove" | { due: DateStr | null } | { profile: string }) {
     const own = ids.filter((id) => !isExternalId(id));
     for (const id of ids.filter(isExternalId)) {
       if (op === "done") await this.toggle(id);
-      else if (op !== "remove") await this.move(id, op.due, null);
+      else if (op !== "remove" && "due" in op) await this.move(id, op.due, null);
     }
     if (!own.length) return;
     const set = new Set(own);
     const removed = op === "remove" ? own.map((id) => this.find(id)).filter((t): t is Task => !!t) : [];
-    const label = op === "done" ? `Выполнено задач: ${own.length}` : op === "remove" ? `Удалено задач: ${own.length}` : `Перенесено задач: ${own.length}`;
+    const label = op === "done" ? `Выполнено задач: ${own.length}` : op === "remove" ? `Удалено задач: ${own.length}`
+      : "profile" in op ? `В профиль «${this.profileInfo(op.profile)?.name ?? op.profile}»: ${own.length}` : `Перенесено задач: ${own.length}`;
     await this.mutate((doc) => {
       if (op === "remove") {
         doc.lines = doc.lines.filter((l) => !(l.kind === "task" && set.has(l.task.id)));
@@ -610,6 +611,8 @@ export class Store extends Events {
         if (!set.has(t.id)) continue;
         if (op === "done") {
           if (!t.done) { t.done = true; t.doneDate = today(); }
+        } else if ("profile" in op) {
+          t.profile = op.profile;
         } else if (t.due !== op.due) {
           if (!t.done && t.due && op.due && op.due > t.due && t.due <= today()) t.moved += 1;
           t.due = op.due;

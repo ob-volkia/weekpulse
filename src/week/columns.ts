@@ -1,6 +1,7 @@
 // Desktop week columns, quick add, calendar events and the multi-select bar.
 
-import { Notice, setIcon } from "obsidian";
+import { Menu, Notice, setIcon } from "obsidian";
+import { isExternalId } from "../external";
 import { DAY_SHORT, DateStr, addDays, dayNum, fmtMinutes, humanDay, relativeLabel, startOfWeek, today, weekDays, weekday } from "../dates";
 import { parseQuick } from "../quickadd";
 import { icon } from "../ui";
@@ -107,6 +108,12 @@ export function renderSelectionBar(v: WeekView, root: HTMLElement) {
   const bar = root.createDiv("wp-selbar");
   const ids = [...v.selection];
   bar.createSpan({ cls: "wp-selbar-count", text: ids.length ? `Выбрано: ${ids.length}` : "Нажимай на задачи" });
+  const all = bar.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": "Выбрать все на экране" } });
+  setIcon(all, "check-check");
+  all.onclick = () => {
+    v.contentEl.querySelectorAll<HTMLElement>(".wp-card[data-id]:not(.is-done)").forEach((c) => v.selection.add(c.dataset.id!));
+    v.render();
+  };
   const act = (ic: string, label: string, fn: () => unknown) => {
     const b = bar.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": label } });
     setIcon(b, ic);
@@ -124,6 +131,22 @@ export function renderSelectionBar(v: WeekView, root: HTMLElement) {
   act("sunrise", "На завтра", () => v.store.bulk(ids, { due: addDays(now, 1) }));
   act("calendar-plus", "На следующую неделю", () => v.store.bulk(ids, { due: addDays(startOfWeek(now), 7) }));
   act("inbox", "В бэклог", () => v.store.bulk(ids, { due: null }));
+  if (v.settings.profiles.length > 1) {
+    const pb = bar.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": "В профиль…" } });
+    setIcon(pb, "layers");
+    pb.disabled = !ids.filter((id) => !isExternalId(id)).length;
+    pb.onclick = (e) => {
+      const m = new Menu();
+      for (const p of v.settings.profiles)
+        m.addItem((i) => i.setTitle(`В «${p.name}»`).setIcon("circle").onClick(async () => {
+          await v.store.bulk(ids, { profile: p.id });
+          v.selection.clear();
+          v.selectMode = false;
+          v.render();
+        }));
+      m.showAtMouseEvent(e);
+    };
+  }
   act("trash-2", "Удалить", () => v.store.bulk(ids, "remove"));
   const close = bar.createEl("button", { cls: "wp-icon-btn clickable-icon", attr: { "aria-label": "Отмена" } });
   setIcon(close, "x");

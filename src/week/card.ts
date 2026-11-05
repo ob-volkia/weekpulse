@@ -139,6 +139,12 @@ export function cardMenu(v: WeekView, t: Task) {
   const prios: Priority[] = [3, 2, 1, 0, -1];
   for (const p of prios)
     m.addItem((i) => i.setTitle(`Приоритет: ${PRIORITY_LABEL[p]}`).setChecked(t.priority === p).onClick(() => v.store.update(t.id, { priority: p })));
+  if (v.settings.profiles.length > 1) {
+    m.addSeparator();
+    const cur = v.store.profileOf(t);
+    for (const p of v.settings.profiles)
+      m.addItem((i) => i.setTitle(`Профиль: ${p.name}`).setChecked(cur === p.id).onClick(() => v.store.update(t.id, { profile: p.id })));
+  }
   m.addSeparator();
   if (t.moved) m.addItem((i) => i.setTitle("Сбросить счётчик переносов").setIcon("rotate-ccw").onClick(() => v.store.update(t.id, { moved: 0 })));
   m.addItem((i) => i.setTitle("Дублировать").setIcon("copy").onClick(() => {
