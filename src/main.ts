@@ -39,7 +39,7 @@ export default class WeekPlannerPlugin extends Plugin {
     this.registerView(VIEW_PROJECTS, (leaf) => new ProjectsView(leaf, this));
     registerDailyBlocks(this);
 
-    this.addRibbonIcon("calendar-days", "Недельный планер", () => this.activateWeek());
+    this.addRibbonIcon("calendar-days", "Weekpulse: неделя", () => this.activateWeek());
     this.addRibbonIcon("timer", "Фокус", () => this.activateFocus());
     this.addRibbonIcon("flame", "Привычки и статистика", () => this.activateHabits());
 
@@ -182,7 +182,7 @@ export default class WeekPlannerPlugin extends Plugin {
       await this.store.archiveOld();
       await this.store.backup();
     } catch (e) {
-      console.error("Week Planner maintenance failed", e);
+      console.error("Weekpulse maintenance failed", e);
     }
   }
 
@@ -272,7 +272,7 @@ export default class WeekPlannerPlugin extends Plugin {
       try {
         feeds.push((await requestUrl({ url, throw: true })).text);
       } catch (e) {
-        console.error("Week Planner: calendar fetch failed", url, e);
+        console.error("Weekpulse: calendar fetch failed", url, e);
         feeds.push("");
         failed++;
       }

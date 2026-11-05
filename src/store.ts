@@ -120,7 +120,7 @@ export interface HabitsData {
 
 const TASKS_HEADER = `# Задачи
 
-Этот файл ведёт плагин Week Planner. Можно редактировать вручную: одна строка — одна задача.
+Этот файл ведёт плагин Weekpulse. Можно редактировать вручную: одна строка — одна задача.
 `;
 
 const HABITS_HEADER = "# Привычки\n";
@@ -650,7 +650,7 @@ export class Store extends Events {
         if (file instanceof TFile) await this.app.vault.process(file, (data) => serializeLog(this.device, [entry, ...parseLog(data, this.device)]));
         else await this.ensureFile(path, serializeLog(this.device, [entry]));
       } catch (e) {
-        console.error("Week Planner: log write failed", e);
+        console.error("Weekpulse: log write failed", e);
       }
     });
   }
