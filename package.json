@@ -11,7 +11,8 @@
     "phone:bridge": "../.tools-venv/bin/pymobiledevice3 webinspector cdp",
     "phone": "node tools/phone.mjs",
     "check": "tsc --noEmit && npm test --silent",
-    "package": "npm run check && OUT_DIR=release/weekpulse node esbuild.config.mjs && cp README.md release/ && cd release && rm -f weekpulse.zip && zip -qr weekpulse.zip weekpulse README.md"
+    "package": "npm run check && OUT_DIR=release/weekpulse node esbuild.config.mjs && cp README.md release/ && cd release && rm -f weekpulse.zip && zip -qr weekpulse.zip weekpulse README.md",
+    "release": "sh tools/release.sh"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
