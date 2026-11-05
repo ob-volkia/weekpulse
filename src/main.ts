@@ -142,6 +142,7 @@ export default class WeekPlannerPlugin extends Plugin {
   onunload() {
     this.focus?.destroy();
     removeNavbarButton();
+    document.body.removeClass("wp-simple-navbar");
   }
 
   // ---------- phone bottom bar ----------
@@ -150,6 +151,7 @@ export default class WeekPlannerPlugin extends Plugin {
 
   setupNavbarButton() {
     if (!Platform.isPhone) return;
+    document.body.toggleClass("wp-simple-navbar", this.settings.simpleNavbar);
     if (!this.settings.navbarButton) {
       removeNavbarButton();
       this.store.trigger("changed");
@@ -561,6 +563,13 @@ class PlannerSettingTab extends PluginSettingTab {
       .setDesc("Добавляет в нижнюю панель Obsidian кнопку новой задачи. Неофициальный способ: после обновления Obsidian кнопка может пропасть — тогда просто выключи.")
       .addToggle((t) => t.setValue(s.navbarButton).onChange(async (v) => {
         s.navbarButton = v;
+        await save();
+        this.plugin.setupNavbarButton();
+      }));
+    new Setting(containerEl).setName("Убрать лишние кнопки нижней панели")
+      .setDesc("Прячет «Назад», «Вперёд», «Быстрый переход» и «Новая вкладка». Остаются «+», вкладки и меню.")
+      .addToggle((t) => t.setValue(s.simpleNavbar).onChange(async (v) => {
+        s.simpleNavbar = v;
         await save();
         this.plugin.setupNavbarButton();
       }));

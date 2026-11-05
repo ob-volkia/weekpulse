@@ -814,3 +814,9 @@ button.wp-danger { color: var(--color-red); }
 .wp-card-meta .wp-profile-dot { width: 7px; height: 7px; }
 .wp-root.is-mobile .wp-m-row button.wp-profile-btn { height: 28px; padding: 0 8px; margin-left: 2px; max-width: 110px; }
 .setting-item-name .wp-profile-dot { width: 12px; height: 12px; }
+
+/* Phone bottom bar: hide buttons a planner doesn't need (setting "Убрать лишние кнопки нижней панели"). */
+body.wp-simple-navbar.is-phone .mobile-navbar-action-back,
+body.wp-simple-navbar.is-phone .mobile-navbar-action-forward,
+body.wp-simple-navbar.is-phone .mobile-navbar-action-quick-switcher,
+body.wp-simple-navbar.is-phone .mobile-navbar-action-new-tab { display: none; }

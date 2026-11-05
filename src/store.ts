@@ -31,6 +31,7 @@ export interface PlannerSettings {
   lastPlannedWeek: string;
   mobileHintShown: boolean;
   navbarButton: boolean;
+  simpleNavbar: boolean; // hide back / forward / quick switcher / new tab in the phone bottom bar
   goalsFile: string;
   backupsFolder: string;
   backupDays: number;
@@ -85,6 +86,7 @@ export const DEFAULT_SETTINGS: PlannerSettings = {
   lastPlannedWeek: "",
   mobileHintShown: false,
   navbarButton: true,
+  simpleNavbar: true,
   goalsFile: "Planner/Goals.md",
   backupsFolder: "Planner/Backups",
   backupDays: 30,
