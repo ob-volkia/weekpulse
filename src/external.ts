@@ -50,8 +50,15 @@ export class ExternalIndex {
     if (this.isExcluded(path)) return false;
     const before = JSON.stringify(this.byPath.get(path) ?? []);
     const tasks: Task[] = [];
+    let fence: string | null = null; // examples inside ``` / ~~~ blocks are not tasks
     text.split(/\r?\n/).forEach((raw, i) => {
-      if (!raw.includes("📅")) return;
+      const f = raw.match(/^\s*(`{3,}|~{3,})/);
+      if (f) {
+        if (!fence) fence = f[1];
+        else if (f[1][0] === fence[0] && f[1].length >= fence.length) fence = null;
+        return;
+      }
+      if (fence || !raw.includes("📅")) return;
       const m = raw.match(LINE_RE);
       if (!m) return;
       const t = parseTaskBody(m[2], m[3]);

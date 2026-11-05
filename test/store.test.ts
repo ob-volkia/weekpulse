@@ -4,6 +4,7 @@ import { expandEvents } from "../src/ics";
 import { parseQuick } from "../src/quickadd";
 import { parseBody, serializeBody } from "../src/tasknotes";
 import { mergeTasks } from "../src/merge";
+import { ExternalIndex } from "../src/external";
 import { computeTrends } from "../src/trends";
 import { parseDoc as pd, docTasks as dt } from "../src/model";
 import { parseHabits, serializeHabits } from "../src/store";
@@ -270,6 +271,11 @@ END:VCALENDAR`;
     eq("under «Всё» new task gets the default profile", added2.profile, "personal");
     store.setProfile("personal");
     eq("personal shows default and orphaned tasks", store.shown().map((t) => t.id).sort(), ["g", "p", added2.id].sort());
+  }
+  {
+    const ix = new ExternalIndex({} as any, () => false);
+    ix.scanText("Guide.md", "- [ ] Real 📅 2026-11-06\n```\n- [ ] Example 📅 2026-11-06\n```\n~~~~md\n- [ ] Tilde 📅 2026-11-06\n```\n~~~~\n- [ ] After 📅 2026-11-07");
+    eq("notes: tasks inside code blocks are ignored", ix.all().map((t) => t.title), ["Real", "After"]);
   }
   process.exit(fail ? 1 : 0);
 })();
